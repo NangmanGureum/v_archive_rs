@@ -1,0 +1,12 @@
+[package]
+name = "v_archive_rs"
+version = "0.1.0"
+edition = "2021"
+description = "A Rust library for V-Archive"
+license = "MIT"
+
+[dependencies]
+ureq = "*"
+serde = { version = "*", features = ["derive"] }
+serde_json = "*"
+serde-this-or-that = "0.4.2"
