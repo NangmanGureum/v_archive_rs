@@ -15,6 +15,8 @@ fn main() {
 ```
 
 ## Update log
+* 0.2.1
+  * Add [Repository URL](https://github.com/NangmanGureum/v_archive_rs) on this crate
 * 0.2.0
   * Fix `VArchiveUserTierInfo` to public
   * Support to load user data for a song. [#](https://github.com/djmax-in/openapi/wiki/%EC%9C%A0%EC%A0%80-%EA%B3%A1%EB%B3%84-%EA%B8%B0%EB%A1%9D-%EC%A1%B0%ED%9A%8C-API)
