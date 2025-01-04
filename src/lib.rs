@@ -134,12 +134,12 @@ impl VArchiveTier {
 pub struct VArchiveUserTierInfo {
     success: bool,
     #[serde(deserialize_with = "as_f64")]
-    top50sum: f64,
+    pub top50sum: f64,
     #[serde(deserialize_with = "as_f64")]
-    tier_point: f64,
-    tier: VArchiveTier,
-    next: VArchiveTier,
-    top_list: Vec<VArchiveSongResult>,
+    pub tier_point: f64,
+    pub tier: VArchiveTier,
+    pub next: VArchiveTier,
+    pub top_list: Vec<VArchiveSongResult>,
 }
 
 impl VArchiveUserTierInfo {
@@ -187,11 +187,15 @@ impl VArchiveUserTierInfo {
 #[serde(rename_all = "camelCase")]
 pub struct VArchivePattern {
     pub level: u8,
+    #[serde(default)]
     pub floor: f64,
+    #[serde(default)]
     #[serde(deserialize_with = "as_f64")]
     pub score: f64,
+    #[serde(default)]
     #[serde(deserialize_with = "as_bool")]
     pub max_combo: bool,
+    #[serde(default)]
     pub rating: f64,
 }
 
@@ -281,8 +285,8 @@ impl VArchiveSongUserResult {
         }
     }
 
-    pub fn load_user_song(username: &str, song_id: &usize) -> Result<Self, VArchiveErr> {
-        let get_url = format!("https://v-archive.net/api/archive/{username}/tier/{buttons}");
+    pub fn load_song_result(username: &str, song_id: &usize) -> Result<Self, VArchiveErr> {
+        let get_url = format!("https://v-archive.net/api/archive/{username}/title/{song_id}");
         let resp = ureq::get(&get_url)
             .set("Content-Type", "application/json")
             .call();
@@ -383,5 +387,23 @@ mod tests {
     }
 
     #[test]
-    fn get_user_song_info() {}
+    fn get_user_song_info() {
+        let example_username = "내꺼";
+        let song_result = VArchiveSongUserResult::load_song_result(example_username, &555);
+
+        match song_result {
+            Ok(r) => {
+                assert_eq!(r.success, true);
+                assert_eq!(r.title, 555);
+                // assert_eq!(r.song_id, 555); -- Maybe does later
+                assert_eq!(r.name, "Gloxinia".to_string());
+                assert_eq!(r.composer, "Ruxxi, Milkoi".to_string());
+                assert_eq!(r.dlc_code, "VE4".to_string());
+                assert_eq!(r.patterns.four_buttons.normal.level, 5);
+            }
+            Err(e) => {
+                panic!("it has error: {},{}", e.error_code, e.message)
+            }
+        };
+    }
 }
