@@ -162,8 +162,127 @@ impl VArchiveUserTierInfo {
         self.next.rating as f64 - self.tier_point
     }
 
-    pub fn load_user_tier(nickname: &str, buttons: &u8) -> Result<Self, VArchiveErr> {
-        let get_url = format!("https://v-archive.net/api/archive/{nickname}/tier/{buttons}");
+    pub fn load_user_tier(username: &str, buttons: &u8) -> Result<Self, VArchiveErr> {
+        let get_url = format!("https://v-archive.net/api/archive/{username}/tier/{buttons}");
+        let resp = ureq::get(&get_url)
+            .set("Content-Type", "application/json")
+            .call();
+
+        match resp {
+            Ok(resp) => {
+                let resp_str = resp.into_string().unwrap();
+                Ok(serde_json::from_str(&resp_str).unwrap())
+            }
+            Err(Error::Status(code, resp)) => Err(VArchiveErr::catch_server_err(code, resp)),
+            Err(_) => Err(VArchiveErr {
+                error_code: 999,
+                message: String::from("Unknown error"),
+            }),
+        }
+    }
+}
+
+/// This is a pattern for a song.
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct VArchivePattern {
+    pub level: u8,
+    pub floor: f64,
+    #[serde(deserialize_with = "as_f64")]
+    pub score: f64,
+    #[serde(deserialize_with = "as_bool")]
+    pub max_combo: bool,
+    pub rating: f64,
+}
+
+impl VArchivePattern {
+    pub fn new() -> Self {
+        Self {
+            level: 0,
+            floor: 0.0,
+            score: 0.0,
+            max_combo: false,
+            rating: 0.0,
+        }
+    }
+}
+
+/// This is pattern list for a kind of buttons for a song.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct VArchivePatternList {
+    #[serde(alias = "NM")]
+    pub normal: VArchivePattern,
+    #[serde(alias = "HD")]
+    pub hard: VArchivePattern,
+    #[serde(alias = "MX")]
+    pub maximum: VArchivePattern,
+    #[serde(alias = "SC")]
+    pub sc: VArchivePattern,
+}
+
+impl VArchivePatternList {
+    pub fn new() -> Self {
+        Self {
+            normal: VArchivePattern::new(),
+            hard: VArchivePattern::new(),
+            maximum: VArchivePattern::new(),
+            sc: VArchivePattern::new(),
+        }
+    }
+}
+
+/// This is a pattern table for a song.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct VArchivePatternTable {
+    #[serde(alias = "4B")]
+    pub four_buttons: VArchivePatternList,
+    #[serde(alias = "5B")]
+    pub five_buttons: VArchivePatternList,
+    #[serde(alias = "6B")]
+    pub six_buttons: VArchivePatternList,
+    #[serde(alias = "8B")]
+    pub eight_buttons: VArchivePatternList,
+}
+
+impl VArchivePatternTable {
+    pub fn new() -> Self {
+        Self {
+            four_buttons: VArchivePatternList::new(),
+            five_buttons: VArchivePatternList::new(),
+            six_buttons: VArchivePatternList::new(),
+            eight_buttons: VArchivePatternList::new(),
+        }
+    }
+}
+
+/// This is a user's song result
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct VArchiveSongUserResult {
+    success: bool,
+    pub title: usize,
+    pub name: String,
+    pub composer: String,
+    pub dlc_code: String,
+    pub dlc: String,
+    pub patterns: VArchivePatternTable,
+}
+
+impl VArchiveSongUserResult {
+    pub fn new() -> Self {
+        Self {
+            success: true,
+            title: 0,
+            name: String::new(),
+            composer: String::new(),
+            dlc_code: String::new(),
+            dlc: String::new(),
+            patterns: VArchivePatternTable::new(),
+        }
+    }
+
+    pub fn load_user_song(username: &str, song_id: &usize) -> Result<Self, VArchiveErr> {
+        let get_url = format!("https://v-archive.net/api/archive/{username}/tier/{buttons}");
         let resp = ureq::get(&get_url)
             .set("Content-Type", "application/json")
             .call();
@@ -262,4 +381,7 @@ mod tests {
         assert_eq!(tier.name, "Silver II".to_string());
         assert_eq!(tier.code, "SV".to_string());
     }
+
+    #[test]
+    fn get_user_song_info() {}
 }
