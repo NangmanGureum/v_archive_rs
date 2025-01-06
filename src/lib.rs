@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use serde_this_or_that::{as_bool, as_f64};
+use serde_this_or_that::{as_bool, as_f64, as_u64};
 use ureq::{Error, Response};
 
 /// This is using for a lot of errors from V-Archive sever.
@@ -7,7 +7,19 @@ use ureq::{Error, Response};
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct VArchiveErr {
+    /// An error code. this shows why it does errored.
+    /// | Code | Reason |
+    /// | ---- | ---- |
+    /// | 101 | Cannot find user |
+    /// | 111 | Has no button data |
+    /// | 201 | (Register a record) Cannot find song  |
+    /// | 202 | Found several songs. (not a song) |
+    /// | 211 | Cannot find a pattern |
+    /// | 900 | Worng parameter(s) |
+    /// | 999 | Other(s) |
     pub error_code: u16,
+    /// This shows more information of an error. Sometimes comes in Korean
+    /// E. g.) `name should not be empty`
     pub message: String,
 }
 
@@ -19,6 +31,7 @@ impl VArchiveErr {
         }
     }
 
+    // Error response to error struct.
     fn catch_server_err(code: u16, resp: Response) -> Self {
         match code {
             400 => {
@@ -50,27 +63,37 @@ impl VArchiveErr {
 /// This is a user's play result for a song.
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct VArchiveSongResult {
+pub struct VArchivePatternResult {
+    /// ID number for a song of the pattern
     pub title: usize,
+    /// A song title of the pattern
     pub name: String,
+    /// A button type of the pattern
     pub button: u8,
+    /// A difficulty type of the pattern
     pub pattern: String,
+    /// A level number of the pattern
     pub level: u8,
+    /// A floor level from V-Archive of the pattern
     #[serde(deserialize_with = "as_f64")]
     pub floor: f64,
+    /// Maximum rating of the pattern
     #[serde(deserialize_with = "as_f64")]
     pub max_rating: f64,
+    /// The user's accuracy rate of the pattern
     #[serde(deserialize_with = "as_f64")]
     pub score: f64,
+    /// The user's MAX COMBO
     #[serde(deserialize_with = "as_bool")]
     pub max_combo: bool,
+    /// The user's rating of the pattern
     #[serde(deserialize_with = "as_f64")]
     pub rating: f64,
 }
 
-impl VArchiveSongResult {
+impl VArchivePatternResult {
     pub fn new() -> Self {
-        VArchiveSongResult {
+        VArchivePatternResult {
             title: 0,
             name: String::new(),
             button: 4,
@@ -102,7 +125,7 @@ impl VArchiveTier {
         }
     }
 
-    /// Make an tier via server. If it errored, it goes `Load Error`
+    /// Make a tier via server.
     pub fn from_point(tier_point: u32) -> Self {
         let req_result = ureq::get("https://v-archive.net/db/tiers.json").call();
         if let Ok(resp) = req_result {
@@ -139,7 +162,7 @@ pub struct VArchiveUserTierInfo {
     pub tier_point: f64,
     pub tier: VArchiveTier,
     pub next: VArchiveTier,
-    pub top_list: Vec<VArchiveSongResult>,
+    pub top_list: Vec<VArchivePatternResult>,
 }
 
 impl VArchiveUserTierInfo {
@@ -162,6 +185,32 @@ impl VArchiveUserTierInfo {
         self.next.rating as f64 - self.tier_point
     }
 
+    /// Load a user's tier info from server
+    /// ## Example
+    /// ```rust
+    /// # use v_archive_rs::VArchiveUserTierInfo;
+    /// #
+    /// # fn main() {
+    /// # // Starts for showing code
+    /// let username = "내꺼";
+    /// let user_tier = VArchiveUserTierInfo::load_user_tier(username, &6);
+    ///
+    /// match user_tier {
+    ///     Ok(tier) => {
+    ///         println!(
+    ///             "Success: {}'s Tier is {}(+{})",
+    ///             username,
+    ///             tier.tier.name,
+    ///             tier.current_tier_diff()
+    ///         );
+    ///     }
+    ///     Err(e) => {
+    ///         println!("Load failed: {}, {}", e.error_code, e.message);
+    ///     }
+    /// }
+    /// # // Ends for showing code
+    /// # }
+    /// ```
     pub fn load_user_tier(username: &str, buttons: &u8) -> Result<Self, VArchiveErr> {
         let get_url = format!("https://v-archive.net/api/archive/{username}/tier/{buttons}");
         let resp = ureq::get(&get_url)
@@ -305,6 +354,104 @@ impl VArchiveSongUserResult {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct VArchiveFloorSongResult {
+    pub title: usize,
+    pub name: String,
+    pub composer: String,
+    pub pattern: String,
+    #[serde(deserialize_with = "as_f64")]
+    pub score: f64,
+    #[serde(deserialize_with = "as_bool")]
+    pub max_combo: bool,
+    pub djpower: f64,
+    pub rating: f64,
+    pub dlc: String,
+    pub dlc_code: String,
+}
+
+impl VArchiveFloorSongResult {
+    pub fn new() -> Self {
+        Self {
+            title: 0,
+            name: String::new(),
+            composer: String::new(),
+            pattern: String::new(),
+            score: 0.0,
+            max_combo: false,
+            djpower: 0.0,
+            rating: 0.0,
+            dlc: String::new(),
+            dlc_code: String::new(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct VArchiveUserFloor {
+    pub floor_number: f64,
+    pub patterns: Vec<VArchiveFloorSongResult>,
+}
+
+impl VArchiveUserFloor {
+    pub fn new() -> Self {
+        Self {
+            floor_number: 0.0,
+            patterns: Vec::new(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct VArciveUserBoard {
+    success: bool,
+    #[serde(alias = "board")]
+    pub board_type: String,
+    #[serde(deserialize_with = "as_u64")]
+    pub button: u64,
+    pub total_count: usize,
+    pub floors: Vec<VArchiveUserFloor>,
+}
+
+impl VArciveUserBoard {
+    pub fn new() -> Self {
+        Self {
+            success: true,
+            board_type: String::new(),
+            button: 4,
+            total_count: 0,
+            floors: Vec::new(),
+        }
+    }
+
+    pub fn load_user_board(
+        username: &str,
+        buttons: &u8,
+        board_type: &str,
+    ) -> Result<Self, VArchiveErr> {
+        let get_url =
+            format!("https://v-archive.net/api/archive/{username}/board/{buttons}/{board_type}");
+        let resp = ureq::get(&get_url)
+            .set("Content-Type", "application/json")
+            .call();
+
+        match resp {
+            Ok(resp) => {
+                let resp_str = resp.into_string().unwrap();
+                Ok(serde_json::from_str(&resp_str).unwrap())
+            }
+            Err(Error::Status(code, resp)) => Err(VArchiveErr::catch_server_err(code, resp)),
+            Err(_) => Err(VArchiveErr {
+                error_code: 999,
+                message: String::from("Unknown error"),
+            }),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -400,6 +547,23 @@ mod tests {
                 assert_eq!(r.composer, "Ruxxi, Milkoi".to_string());
                 assert_eq!(r.dlc_code, "VE4".to_string());
                 assert_eq!(r.patterns.four_buttons.normal.level, 5);
+            }
+            Err(e) => {
+                panic!("it has error: {},{}", e.error_code, e.message)
+            }
+        };
+    }
+
+    #[test]
+    fn get_user_board() {
+        let example_username = "내꺼";
+        let user_board_resp = VArciveUserBoard::load_user_board(example_username, &6, "MX");
+
+        match user_board_resp {
+            Ok(board) => {
+                assert_eq!(board.success, true);
+                assert_eq!(board.board_type, "MX".to_string());
+                assert_eq!(board.button, 6);
             }
             Err(e) => {
                 panic!("it has error: {},{}", e.error_code, e.message)

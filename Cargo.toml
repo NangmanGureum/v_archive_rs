@@ -1,9 +1,10 @@
 [package]
 name = "v_archive_rs"
-version = "0.2.1"
+version = "0.3.0"
 edition = "2021"
 description = "A Rust library for V-Archive"
 license = "MIT"
+documentation = "https://docs.rs/v_archive_rs"
 repository = "https://github.com/NangmanGureum/v_archive_rs"
 
 [dependencies]
