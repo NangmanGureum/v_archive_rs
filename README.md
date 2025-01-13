@@ -18,6 +18,9 @@ fn main() {
 ```
 
 ## Update log
+* 0.4.0
+  * Support to register user record. [#](https://github.com/djmax-in/openapi/wiki/%EA%B8%B0%EB%A1%9D-%EB%93%B1%EB%A1%9D-API)
+  * Fix [TODO.md](./TODO.md)
 * 0.3.0
   * Add [document URL](https://docs.rs/v_archive_rs) on this crate
   * Add more document stuff (`VArchiveUserTierInfo` and related stuff)

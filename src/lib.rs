@@ -452,6 +452,78 @@ impl VArciveUserBoard {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct VArchiveRegisterResult {
+    success: bool,
+    update: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct VArchiveRegisterRecord {
+    pub name: String,
+    pub dlc: String,
+    pub composer: String,
+    pub button: u8,
+    pub pattern: String,
+    pub score: f64,
+    pub max_combo: u8,
+}
+
+impl VArchiveRegisterRecord {
+    pub fn new() -> Self {
+        Self {
+            name: String::new(),
+            dlc: String::new(),
+            composer: String::new(),
+            button: 0,
+            pattern: "NORMAL".to_string(),
+            score: 0.0,
+            max_combo: 0,
+        }
+    }
+}
+
+pub struct VArchiveUserToken {
+    pub user_num: usize,
+    pub user_token: String,
+}
+
+impl VArchiveUserToken {
+    pub fn new() -> Self {
+        Self {
+            user_num: 0,
+            user_token: String::new(),
+        }
+    }
+
+    pub fn register_record(
+        self,
+        record: VArchiveRegisterRecord,
+    ) -> Result<VArchiveRegisterResult, VArchiveErr> {
+        let user_num = self.user_num;
+        let record_serial = serde_json::to_string(&record).unwrap();
+
+        let post_url = format!("https://v-archive.net/client/open/{user_num}/score");
+        let resp = ureq::post(&post_url)
+            .set("Authorization", &self.user_token)
+            .set("Content-Type", "application/json")
+            .send_string(&record_serial);
+
+        match resp {
+            Ok(resp) => {
+                let resp_str = resp.into_string().unwrap();
+                Ok(serde_json::from_str(&resp_str).unwrap())
+            }
+            Err(Error::Status(code, resp)) => Err(VArchiveErr::catch_server_err(code, resp)),
+            Err(_) => Err(VArchiveErr {
+                error_code: 999,
+                message: String::from("Unknown error"),
+            }),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -565,6 +637,33 @@ mod tests {
                 assert_eq!(board.board_type, "MX".to_string());
                 assert_eq!(board.button, 6);
             }
+            Err(e) => {
+                panic!("it has error: {},{}", e.error_code, e.message)
+            }
+        };
+    }
+
+    #[test]
+    fn register_record() {
+        let user = VArchiveUserToken {
+            user_num: 1,
+            user_token: "95d6c422-52b4-4016-8587-38c46a2e7917".to_string(),
+        };
+
+        let play_record = VArchiveRegisterRecord {
+            name: "Urban Night".to_string(),
+            dlc: "EMOTIONAL S.".to_string(),
+            composer: "Electronic Boutique".to_string(),
+            button: 6,
+            pattern: "SC".to_string(),
+            score: 90.9,
+            max_combo: 0,
+        };
+
+        let req = user.register_record(play_record);
+
+        match req {
+            Ok(r) => assert_eq!(r.success, true),
             Err(e) => {
                 panic!("it has error: {},{}", e.error_code, e.message)
             }
