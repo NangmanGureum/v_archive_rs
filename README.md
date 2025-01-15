@@ -18,6 +18,9 @@ fn main() {
 ```
 
 ## Update log
+* 0.5.0
+  * Support to load list of all songs, tiers, and board types.
+  * Fix sturct with serde's `Default`:  `VArchivePatternList`, and related stuffs
 * 0.4.0
   * Support to register user record. [#](https://github.com/djmax-in/openapi/wiki/%EA%B8%B0%EB%A1%9D-%EB%93%B1%EB%A1%9D-API)
   * Fix [TODO.md](./TODO.md)

@@ -232,7 +232,7 @@ impl VArchiveUserTierInfo {
 }
 
 /// This is a pattern for a song.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct VArchivePattern {
     pub level: u8,
@@ -263,12 +263,16 @@ impl VArchivePattern {
 /// This is pattern list for a kind of buttons for a song.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct VArchivePatternList {
+    #[serde(default)]
     #[serde(alias = "NM")]
     pub normal: VArchivePattern,
+    #[serde(default)]
     #[serde(alias = "HD")]
     pub hard: VArchivePattern,
+    #[serde(default)]
     #[serde(alias = "MX")]
     pub maximum: VArchivePattern,
+    #[serde(default)]
     #[serde(alias = "SC")]
     pub sc: VArchivePattern,
 }
@@ -524,6 +528,103 @@ impl VArchiveUserToken {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct VArchiveSongPattern {
+    pub level: u8,
+    #[serde(default)]
+    pub floor: f64,
+    #[serde(default)]
+    pub rating: f64,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct VArchiveSongPatternList {
+    #[serde(default)]
+    #[serde(alias = "NM")]
+    pub normal: VArchiveSongPattern,
+    #[serde(default)]
+    #[serde(alias = "HD")]
+    pub hard: VArchiveSongPattern,
+    #[serde(default)]
+    #[serde(alias = "MX")]
+    pub maximum: VArchiveSongPattern,
+    #[serde(default)]
+    #[serde(alias = "SC")]
+    pub sc: VArchiveSongPattern,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct VArchiveSongPatternTable {
+    #[serde(alias = "4B")]
+    pub four_buttons: VArchiveSongPatternList,
+    #[serde(alias = "5B")]
+    pub five_buttons: VArchiveSongPatternList,
+    #[serde(alias = "6B")]
+    pub six_buttons: VArchiveSongPatternList,
+    #[serde(alias = "8B")]
+    pub eight_buttons: VArchiveSongPatternList,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct VArchiveSong {
+    pub title: usize,
+    pub name: String,
+    pub composer: String,
+    pub dlc_code: String,
+    pub dlc: String,
+    pub patterns: VArchiveSongPatternTable,
+}
+
+pub fn all_songs() -> Result<Vec<VArchiveSong>, VArchiveErr> {
+    let resp = ureq::get("https://v-archive.net/db/songs.json").call();
+
+    match resp {
+        Ok(resp) => {
+            let resp_str = resp.into_string().unwrap();
+            Ok(serde_json::from_str(&resp_str).unwrap())
+        }
+        Err(Error::Status(code, resp)) => Err(VArchiveErr::catch_server_err(code, resp)),
+        Err(_) => Err(VArchiveErr {
+            error_code: 999,
+            message: String::from("Unknown error"),
+        }),
+    }
+}
+
+pub fn tier_list() -> Result<Vec<VArchiveTier>, VArchiveErr> {
+    let resp = ureq::get("https://v-archive.net/db/tiers.json").call();
+
+    match resp {
+        Ok(resp) => {
+            let resp_str = resp.into_string().unwrap();
+            Ok(serde_json::from_str(&resp_str).unwrap())
+        }
+        Err(Error::Status(code, resp)) => Err(VArchiveErr::catch_server_err(code, resp)),
+        Err(_) => Err(VArchiveErr {
+            error_code: 999,
+            message: String::from("Unknown error"),
+        }),
+    }
+}
+
+pub fn board_types() -> Result<Vec<String>, VArchiveErr> {
+    let resp = ureq::get("https://v-archive.net/db/boards.json").call();
+
+    match resp {
+        Ok(resp) => {
+            let resp_str = resp.into_string().unwrap();
+            Ok(serde_json::from_str(&resp_str).unwrap())
+        }
+        Err(Error::Status(code, resp)) => Err(VArchiveErr::catch_server_err(code, resp)),
+        Err(_) => Err(VArchiveErr {
+            error_code: 999,
+            message: String::from("Unknown error"),
+        }),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -664,6 +765,25 @@ mod tests {
 
         match req {
             Ok(r) => assert_eq!(r.success, true),
+            Err(e) => {
+                panic!("it has error: {},{}", e.error_code, e.message)
+            }
+        };
+    }
+
+    #[test]
+    fn load_all_songs() {
+        let song_list_resp = all_songs();
+
+        match song_list_resp {
+            Ok(list) => {
+                let first_song = &list[0];
+                assert_eq!(first_song.name, "비상 ~Stay With Me~".to_string());
+                assert_eq!(first_song.composer, "Mycin.T".to_string());
+                assert_eq!(first_song.dlc_code, "R".to_string());
+                assert_eq!(first_song.dlc, "RESPECT".to_string());
+                assert_eq!(first_song.patterns.four_buttons.normal.level, 4);
+            }
             Err(e) => {
                 panic!("it has error: {},{}", e.error_code, e.message)
             }
