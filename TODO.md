@@ -1,1 +1,6 @@
-1. Replace `title`(as song data) to `song_id`. (Maybe?)
+* Delete some struct:
+  * `VArchiveErr` (Replaced to `APIError`)
+* Changes terms (Ref: [https://iidx.org/terminology])
+  * Pattern -> Chart
+  * `title` -> `song_id`
+  * (on related) `name` -> `title`

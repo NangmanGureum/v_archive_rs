@@ -1,6 +1,6 @@
 [package]
 name = "v_archive_rs"
-version = "0.5.0"
+version = "0.6.0"
 edition = "2021"
 description = "A Rust library for V-Archive"
 license = "MIT"
@@ -8,7 +8,7 @@ documentation = "https://docs.rs/v_archive_rs"
 repository = "https://github.com/NangmanGureum/v_archive_rs"
 
 [dependencies]
-ureq = "2.12.1"
+ureq = { version = "2.12.1", features = ["json"] }
 serde = { version = "1.0.217", features = ["derive"] }
 serde_json = "1.0.134"
 serde-this-or-that = "0.4.2"

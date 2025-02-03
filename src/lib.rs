@@ -1,6 +1,88 @@
 use serde::{Deserialize, Serialize};
 use serde_this_or_that::{as_bool, as_f64, as_u64};
+use std::fmt;
 use ureq::{Error, Response};
+
+/// This is using for a lot of errors from V-Archive sever.
+/// Mostly, it comes `Result<_, APIError>`
+#[derive(Debug)]
+pub enum APIError {
+    CannotFindUser,
+    HasNoButtonRecord,
+    CannotFindSong,
+    FoundSeveralSongs,
+    CannotFoundChart,
+    WrongParameter(String),
+    //
+    // Other Server Error
+    InernalServerError,
+    APIUnknownError(u16, String),
+    HTTPErr(u16),
+    UnknownError,
+}
+
+impl fmt::Display for APIError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            APIError::CannotFindUser => write!(f, "Cannot find user"),
+            APIError::HasNoButtonRecord => write!(f, "Has no button record"),
+            APIError::CannotFindSong => write!(f, "Cannot find song"),
+            APIError::FoundSeveralSongs => write!(f, "Found several songs"),
+            APIError::CannotFoundChart => write!(f, "Cannot find chart"),
+            APIError::WrongParameter(m) => write!(f, "Wrong parameter(s): {}", m),
+            APIError::InernalServerError => write!(f, "Inernal server error"),
+            APIError::APIUnknownError(c, m) => write!(f, "Unknown API error: {}, {}", c, m),
+            APIError::HTTPErr(c) => write!(f, "HTTP error: {}", c),
+            APIError::UnknownError => write!(f, "Unknown"),
+        }
+    }
+}
+
+/// Return to error object. for in this crate
+fn catch_server_err(code: u16, resp: Response) -> APIError {
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct APIBody {
+        error_code: u16,
+        message: String,
+    }
+
+    let resp_str = resp.into_string().unwrap();
+    let error_body: APIBody = serde_json::from_str(&resp_str).unwrap();
+
+    match code {
+        400 | 404 => {
+            let error_code = error_body.error_code;
+            match error_code {
+                101 => {
+                    return APIError::CannotFindUser;
+                }
+                111 => {
+                    return APIError::HasNoButtonRecord;
+                }
+                201 => {
+                    return APIError::CannotFindSong;
+                }
+                202 => {
+                    return APIError::FoundSeveralSongs;
+                }
+                211 => {
+                    return APIError::CannotFoundChart;
+                }
+                900 => {
+                    let err_msg = error_body.message;
+                    return APIError::WrongParameter(err_msg);
+                }
+                c => {
+                    let err_msg = error_body.message;
+                    return APIError::APIUnknownError(c, err_msg);
+                }
+            }
+        }
+        500 => return APIError::InernalServerError,
+        c => return APIError::HTTPErr(c),
+    };
+}
 
 /// This is using for a lot of errors from V-Archive sever.
 /// Mostly, it comes `Result<_,VArchiveErr>`
@@ -15,7 +97,7 @@ pub struct VArchiveErr {
     /// | 201 | (Register a record) Cannot find song  |
     /// | 202 | Found several songs. (not a song) |
     /// | 211 | Cannot find a pattern |
-    /// | 900 | Worng parameter(s) |
+    /// | 900 | Wrong parameter(s) |
     /// | 999 | Other(s) |
     pub error_code: u16,
     /// This shows more information of an error. Sometimes comes in Korean
@@ -193,7 +275,7 @@ impl VArchiveUserTierInfo {
     /// # fn main() {
     /// # // Starts for showing code
     /// let username = "내꺼";
-    /// let user_tier = VArchiveUserTierInfo::load_user_tier(username, &6);
+    /// let user_tier = VArchiveUserTierInfo::load_user_tier(username, 6);
     ///
     /// match user_tier {
     ///     Ok(tier) => {
@@ -205,13 +287,13 @@ impl VArchiveUserTierInfo {
     ///         );
     ///     }
     ///     Err(e) => {
-    ///         println!("Load failed: {}, {}", e.error_code, e.message);
+    ///         println!("Load failed: {:?}", e);
     ///     }
     /// }
     /// # // Ends for showing code
     /// # }
     /// ```
-    pub fn load_user_tier(username: &str, buttons: &u8) -> Result<Self, VArchiveErr> {
+    pub fn load_user_tier(username: &str, buttons: u8) -> Result<Self, APIError> {
         let get_url = format!("https://v-archive.net/api/archive/{username}/tier/{buttons}");
         let resp = ureq::get(&get_url)
             .set("Content-Type", "application/json")
@@ -222,11 +304,8 @@ impl VArchiveUserTierInfo {
                 let resp_str = resp.into_string().unwrap();
                 Ok(serde_json::from_str(&resp_str).unwrap())
             }
-            Err(Error::Status(code, resp)) => Err(VArchiveErr::catch_server_err(code, resp)),
-            Err(_) => Err(VArchiveErr {
-                error_code: 999,
-                message: String::from("Unknown error"),
-            }),
+            Err(Error::Status(code, resp)) => Err(catch_server_err(code, resp)),
+            Err(_) => Err(APIError::UnknownError),
         }
     }
 }
@@ -630,34 +709,24 @@ mod tests {
     use super::*;
 
     #[test]
-    fn tier_info_load() {
-        // Loading tier info; as 4 buttons tier on "DEV"
-        let example_username = "DEV";
-        let load_user_tier = VArchiveUserTierInfo::load_user_tier(&example_username, &4);
-
-        match load_user_tier {
-            Ok(info) => {
-                assert_eq!(info.success, true);
-            }
-            Err(_) => {
-                panic!("not successed to load user tier info")
-            }
-        };
-    }
-
-    #[test]
     fn not_available_buttons() {
         // Loading tier info; as "10" buttons(which is **not available**) tier on DEV
         let example_username = "DEV";
-        let load_user_tier = VArchiveUserTierInfo::load_user_tier(&example_username, &10);
+        let load_user_tier = VArchiveUserTierInfo::load_user_tier(example_username, 10);
 
         match load_user_tier {
             Ok(_) => {
                 panic!("this should be become to error.")
             }
             Err(e) => {
-                // Error code 900 means worng parameter; include "not avaliable buttons".
-                assert_eq!(e.error_code, 900);
+                match e {
+                    APIError::WrongParameter(m) => {
+                        assert_eq!(m, "버튼 찾을 수 없음".to_owned());
+                    }
+                    another_e => {
+                        panic!("It raised another error: {:?}", another_e);
+                    }
+                };
             }
         };
     }
@@ -666,15 +735,19 @@ mod tests {
     fn check_no_data() {
         // Loading tier info; as 4 buttons tier on "no_data"
         let example_username = "no_data";
-        let load_user_tier = VArchiveUserTierInfo::load_user_tier(&example_username, &4);
+        let load_user_tier = VArchiveUserTierInfo::load_user_tier(&example_username, 4);
 
         match load_user_tier {
             Ok(_) => {
                 panic!("this should be become to error.")
             }
             Err(e) => {
-                // Error code 111 means they have no 4 buttons data.
-                assert_eq!(e.error_code, 111);
+                match e {
+                    APIError::HasNoButtonRecord => {}
+                    another_e => {
+                        panic!("It raised another error: {:?}", another_e);
+                    }
+                };
             }
         };
     }
@@ -683,16 +756,18 @@ mod tests {
     fn check_no_user() {
         // Loading tier info; as 4 buttons tier on "no_account"
         let example_username = "no_account";
-        let load_user_tier = VArchiveUserTierInfo::load_user_tier(&example_username, &4);
+        let load_user_tier = VArchiveUserTierInfo::load_user_tier(&example_username, 4);
 
         match load_user_tier {
             Ok(_) => {
                 panic!("this should be become to error.")
             }
-            Err(e) => {
-                // Error code 101 means cannot find user.
-                assert_eq!(e.error_code, 101);
-            }
+            Err(e) => match e {
+                APIError::CannotFindUser => {}
+                another_e => {
+                    panic!("It raised another error: {:?}", another_e);
+                }
+            },
         };
     }
 
@@ -704,6 +779,22 @@ mod tests {
         assert_eq!(tier.rating, 7000);
         assert_eq!(tier.name, "Silver II".to_string());
         assert_eq!(tier.code, "SV".to_string());
+    }
+
+    #[test]
+    fn tier_info_load() {
+        // Loading tier info; as 4 buttons tier on "DEV"
+        let example_username = "DEV";
+        let load_user_tier = VArchiveUserTierInfo::load_user_tier(&example_username, 4);
+
+        match load_user_tier {
+            Ok(info) => {
+                assert_eq!(info.success, true);
+            }
+            Err(_) => {
+                panic!("not successed to load user tier info")
+            }
+        };
     }
 
     #[test]
