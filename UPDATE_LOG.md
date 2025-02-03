@@ -1,3 +1,5 @@
+* 0.6.1
+  * Fix `README.md`
 * 0.6.0
   * Add new `enum`: `APIError` (for replace)
   * Change function: `VArchiveUserTierInfo::load_user_tier`

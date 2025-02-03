@@ -18,4 +18,4 @@ fn main() {
 ```
 
 ## Update log
-See [UPDATE_LOG.md]
+See [UPDATE_LOG.md](./UPDATE_LOG.md)
