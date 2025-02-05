@@ -84,65 +84,88 @@ fn catch_server_err(code: u16, resp: Response) -> APIError {
     };
 }
 
-/// This is using for a lot of errors from V-Archive sever.
-/// Mostly, it comes `Result<_,VArchiveErr>`
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct VArchiveErr {
-    /// An error code. this shows why it does errored.
-    /// | Code | Reason |
-    /// | ---- | ---- |
-    /// | 101 | Cannot find user |
-    /// | 111 | Has no button data |
-    /// | 201 | (Register a record) Cannot find song  |
-    /// | 202 | Found several songs. (not a song) |
-    /// | 211 | Cannot find a pattern |
-    /// | 900 | Wrong parameter(s) |
-    /// | 999 | Other(s) |
-    pub error_code: u16,
-    /// This shows more information of an error. Sometimes comes in Korean
-    /// E. g.) `name should not be empty`
-    pub message: String,
+#[derive(Debug)]
+pub enum RespectCat {
+    Respect,
+    RespectV,
 }
 
-impl VArchiveErr {
-    pub fn new() -> Self {
-        Self {
-            error_code: 0,
-            message: String::new(),
-        }
-    }
-
-    // Error response to error struct.
-    fn catch_server_err(code: u16, resp: Response) -> Self {
-        match code {
-            400 => {
-                let resp_str = resp.into_string().unwrap();
-                return serde_json::from_str(&resp_str).unwrap();
-            }
-            404 => {
-                let resp_str = resp.into_string().unwrap();
-                return serde_json::from_str(&resp_str).unwrap();
-            }
-            500 => {
-                return VArchiveErr {
-                    error_code: 999,
-                    message: String::from("Internal Server Error (500)"),
-                }
-            }
-            _ => {
-                // println!("Error: Unknown, as code {code}")
-                let message = format!("Unknown error from server ({})", code);
-                return VArchiveErr {
-                    error_code: 999,
-                    message,
-                };
-            }
-        };
-    }
+#[derive(Debug)]
+pub enum LegacyCat {
+    PortableOne,
+    PortableTwo,
 }
 
-/// This is a user's play result for a song.
+#[derive(Debug)]
+pub enum LegacyExtCat {
+    Trilogy,
+    Clazziquai,
+    Technika,
+    BlackSquare,
+    TechnikaTwo,
+    TechnikaThree,
+    EmotionalSense,
+    PortableThree,
+    TechnikaTuneQ,
+}
+
+#[derive(Debug)]
+pub enum NewExtCat {
+    VExtentionOne,
+    VExtentionTwo,
+    VExtentionThree,
+    VExtentionFour,
+    VExtentionFive,
+    VLivertyOne,
+    VLivertyTwo,
+}
+
+#[derive(Debug)]
+pub enum SongCatagory {
+    Respect(RespectCat),
+    Legacy(LegacyCat),
+    LegacyExtention(LegacyExtCat),
+    NewExtention(NewExtCat),
+    MusicCollab(String),
+    Others(String),
+}
+
+#[derive(Debug)]
+pub enum ButtonMode {
+    Four,
+    Five,
+    Six,
+    Eight,
+}
+
+/// A struct for user's record for a chart
+#[derive(Debug)]
+pub struct UserRecordForChart {
+    /// ID number for a song of the chart
+    pub song_id: usize,
+    /// A song title for the chart
+    pub title: String,
+    /// A button type of the chart
+    pub button: ButtonMode,
+    /// A user's accuracy rate for the chart
+    pub acc_rate: f64,
+    /// user's max combo or not for the chart
+    pub is_max_combo: bool,
+    /// A level for the chart
+    pub level: u8,
+    /// A level on V-Archive's floor
+    pub floor_level: f64,
+    /// A user's rating on V-Archive for a chart
+    pub user_rating: f64,
+    /// A maximum rating on V-Archive for a chart
+    pub maximum_rating: f64,
+    /// A DJPOWER point for DJMAX. (This may differ from in-game.)
+    pub dj_power: f64,
+    /// A category for a song of the chart
+    pub song_cat: SongCatagory,
+}
+
+/// This is a user's play result for a song. Legacy struct (which will be removed.)
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct VArchivePatternResult {
@@ -190,7 +213,7 @@ impl VArchivePatternResult {
     }
 }
 
-/// This is a tier.
+/// This is a tier. Legacy struct (which will be removed.)
 #[derive(Serialize, Deserialize, Debug)]
 pub struct VArchiveTier {
     pub rating: u32,
@@ -233,7 +256,7 @@ impl VArchiveTier {
     }
 }
 
-/// This is a user's tier table
+/// This is a user's tier table. Legacy struct (which will be removed.)
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct VArchiveUserTierInfo {
@@ -310,7 +333,7 @@ impl VArchiveUserTierInfo {
     }
 }
 
-/// This is a pattern for a song.
+/// This is a pattern for a song. Legacy struct (which will be removed.)
 #[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct VArchivePattern {
@@ -339,7 +362,7 @@ impl VArchivePattern {
     }
 }
 
-/// This is pattern list for a kind of buttons for a song.
+/// This is pattern list for a kind of buttons for a song. Legacy struct (which will be removed.)
 #[derive(Serialize, Deserialize, Debug)]
 pub struct VArchivePatternList {
     #[serde(default)]
@@ -391,7 +414,7 @@ impl VArchivePatternTable {
     }
 }
 
-/// This is a user's song result
+/// This is a user's song result. Legacy struct (which will be removed.)
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct VArchiveSongUserResult {
@@ -417,7 +440,7 @@ impl VArchiveSongUserResult {
         }
     }
 
-    pub fn load_song_result(username: &str, song_id: &usize) -> Result<Self, VArchiveErr> {
+    pub fn load_song_result(username: &str, song_id: &usize) -> Result<Self, APIError> {
         let get_url = format!("https://v-archive.net/api/archive/{username}/title/{song_id}");
         let resp = ureq::get(&get_url)
             .set("Content-Type", "application/json")
@@ -428,15 +451,13 @@ impl VArchiveSongUserResult {
                 let resp_str = resp.into_string().unwrap();
                 Ok(serde_json::from_str(&resp_str).unwrap())
             }
-            Err(Error::Status(code, resp)) => Err(VArchiveErr::catch_server_err(code, resp)),
-            Err(_) => Err(VArchiveErr {
-                error_code: 999,
-                message: String::from("Unknown error"),
-            }),
+            Err(Error::Status(code, resp)) => Err(catch_server_err(code, resp)),
+            Err(_) => Err(APIError::UnknownError),
         }
     }
 }
 
+/// Legacy struct (which will be removed.)
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct VArchiveFloorSongResult {
@@ -471,6 +492,7 @@ impl VArchiveFloorSongResult {
     }
 }
 
+/// Legacy struct (which will be removed.)
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct VArchiveUserFloor {
@@ -487,6 +509,7 @@ impl VArchiveUserFloor {
     }
 }
 
+/// Legacy struct (which will be removed.)
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct VArciveUserBoard {
@@ -514,7 +537,7 @@ impl VArciveUserBoard {
         username: &str,
         buttons: &u8,
         board_type: &str,
-    ) -> Result<Self, VArchiveErr> {
+    ) -> Result<Self, APIError> {
         let get_url =
             format!("https://v-archive.net/api/archive/{username}/board/{buttons}/{board_type}");
         let resp = ureq::get(&get_url)
@@ -526,11 +549,8 @@ impl VArciveUserBoard {
                 let resp_str = resp.into_string().unwrap();
                 Ok(serde_json::from_str(&resp_str).unwrap())
             }
-            Err(Error::Status(code, resp)) => Err(VArchiveErr::catch_server_err(code, resp)),
-            Err(_) => Err(VArchiveErr {
-                error_code: 999,
-                message: String::from("Unknown error"),
-            }),
+            Err(Error::Status(code, resp)) => Err(catch_server_err(code, resp)),
+            Err(_) => Err(APIError::UnknownError),
         }
     }
 }
@@ -583,7 +603,7 @@ impl VArchiveUserToken {
     pub fn register_record(
         self,
         record: VArchiveRegisterRecord,
-    ) -> Result<VArchiveRegisterResult, VArchiveErr> {
+    ) -> Result<VArchiveRegisterResult, APIError> {
         let user_num = self.user_num;
         let record_serial = serde_json::to_string(&record).unwrap();
 
@@ -598,15 +618,13 @@ impl VArchiveUserToken {
                 let resp_str = resp.into_string().unwrap();
                 Ok(serde_json::from_str(&resp_str).unwrap())
             }
-            Err(Error::Status(code, resp)) => Err(VArchiveErr::catch_server_err(code, resp)),
-            Err(_) => Err(VArchiveErr {
-                error_code: 999,
-                message: String::from("Unknown error"),
-            }),
+            Err(Error::Status(code, resp)) => Err(catch_server_err(code, resp)),
+            Err(_) => Err(APIError::UnknownError),
         }
     }
 }
 
+/// Legacy struct (which will be removed.)
 #[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct VArchiveSongPattern {
@@ -617,6 +635,7 @@ pub struct VArchiveSongPattern {
     pub rating: f64,
 }
 
+/// Legacy struct (which will be removed.)
 #[derive(Serialize, Deserialize, Debug)]
 pub struct VArchiveSongPatternList {
     #[serde(default)]
@@ -633,6 +652,7 @@ pub struct VArchiveSongPatternList {
     pub sc: VArchiveSongPattern,
 }
 
+/// Legacy struct (which will be removed.)
 #[derive(Serialize, Deserialize, Debug)]
 pub struct VArchiveSongPatternTable {
     #[serde(alias = "4B")]
@@ -645,6 +665,7 @@ pub struct VArchiveSongPatternTable {
     pub eight_buttons: VArchiveSongPatternList,
 }
 
+/// Legacy struct (which will be removed.)
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct VArchiveSong {
@@ -656,7 +677,7 @@ pub struct VArchiveSong {
     pub patterns: VArchiveSongPatternTable,
 }
 
-pub fn all_songs() -> Result<Vec<VArchiveSong>, VArchiveErr> {
+pub fn all_songs() -> Result<Vec<VArchiveSong>, APIError> {
     let resp = ureq::get("https://v-archive.net/db/songs.json").call();
 
     match resp {
@@ -664,15 +685,12 @@ pub fn all_songs() -> Result<Vec<VArchiveSong>, VArchiveErr> {
             let resp_str = resp.into_string().unwrap();
             Ok(serde_json::from_str(&resp_str).unwrap())
         }
-        Err(Error::Status(code, resp)) => Err(VArchiveErr::catch_server_err(code, resp)),
-        Err(_) => Err(VArchiveErr {
-            error_code: 999,
-            message: String::from("Unknown error"),
-        }),
+        Err(Error::Status(code, resp)) => Err(catch_server_err(code, resp)),
+        Err(_) => Err(APIError::UnknownError),
     }
 }
 
-pub fn tier_list() -> Result<Vec<VArchiveTier>, VArchiveErr> {
+pub fn tier_list() -> Result<Vec<VArchiveTier>, APIError> {
     let resp = ureq::get("https://v-archive.net/db/tiers.json").call();
 
     match resp {
@@ -680,15 +698,12 @@ pub fn tier_list() -> Result<Vec<VArchiveTier>, VArchiveErr> {
             let resp_str = resp.into_string().unwrap();
             Ok(serde_json::from_str(&resp_str).unwrap())
         }
-        Err(Error::Status(code, resp)) => Err(VArchiveErr::catch_server_err(code, resp)),
-        Err(_) => Err(VArchiveErr {
-            error_code: 999,
-            message: String::from("Unknown error"),
-        }),
+        Err(Error::Status(code, resp)) => Err(catch_server_err(code, resp)),
+        Err(_) => Err(APIError::UnknownError),
     }
 }
 
-pub fn board_types() -> Result<Vec<String>, VArchiveErr> {
+pub fn board_types() -> Result<Vec<String>, APIError> {
     let resp = ureq::get("https://v-archive.net/db/boards.json").call();
 
     match resp {
@@ -696,11 +711,8 @@ pub fn board_types() -> Result<Vec<String>, VArchiveErr> {
             let resp_str = resp.into_string().unwrap();
             Ok(serde_json::from_str(&resp_str).unwrap())
         }
-        Err(Error::Status(code, resp)) => Err(VArchiveErr::catch_server_err(code, resp)),
-        Err(_) => Err(VArchiveErr {
-            error_code: 999,
-            message: String::from("Unknown error"),
-        }),
+        Err(Error::Status(code, resp)) => Err(catch_server_err(code, resp)),
+        Err(_) => Err(APIError::UnknownError),
     }
 }
 
@@ -813,7 +825,7 @@ mod tests {
                 assert_eq!(r.patterns.four_buttons.normal.level, 5);
             }
             Err(e) => {
-                panic!("it has error: {},{}", e.error_code, e.message)
+                panic!("it has error: {}", e.to_string())
             }
         };
     }
@@ -830,7 +842,7 @@ mod tests {
                 assert_eq!(board.button, 6);
             }
             Err(e) => {
-                panic!("it has error: {},{}", e.error_code, e.message)
+                panic!("it has error: {}", e)
             }
         };
     }
@@ -857,7 +869,7 @@ mod tests {
         match req {
             Ok(r) => assert_eq!(r.success, true),
             Err(e) => {
-                panic!("it has error: {},{}", e.error_code, e.message)
+                panic!("it has error: {}", e)
             }
         };
     }
@@ -876,7 +888,7 @@ mod tests {
                 assert_eq!(first_song.patterns.four_buttons.normal.level, 4);
             }
             Err(e) => {
-                panic!("it has error: {},{}", e.error_code, e.message)
+                panic!("it has error: {}", e)
             }
         };
     }

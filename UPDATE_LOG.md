@@ -1,3 +1,13 @@
+* 0.7.0
+  * Remove `struct`: `VArchiveErr`
+  * Add new `struct`: `UserRecordForChart` (for replace)
+  * Add new `enum`s (note: `cat` stands for 'catagory')
+    * `SongCatagory`
+    * `RespectCat`
+    * `LegacyCat`
+    * `LegacyExtCat`
+    * `NewExtCat`
+    * `ButtonMode`
 * 0.6.1
   * Fix `README.md`
 * 0.6.0
