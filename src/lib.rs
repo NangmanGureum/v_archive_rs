@@ -3,8 +3,7 @@ use serde_this_or_that::{as_bool, as_f64, as_u64};
 use std::fmt;
 use ureq::{Error, Response};
 
-/// This is using for a lot of errors from V-Archive sever.
-/// Mostly, it comes `Result<_, APIError>`
+/// This is using for a lot of errors from V-Archive sever. Mostly, it comes as `Result<_, APIError>`
 #[derive(Debug)]
 pub enum APIError {
     CannotFindUser,
@@ -100,7 +99,7 @@ pub enum LegacyCat {
 pub enum LegacyExtCat {
     Trilogy,
     Clazziquai,
-    Technika,
+    TechnikaOne,
     BlackSquare,
     TechnikaTwo,
     TechnikaThree,
@@ -126,8 +125,38 @@ pub enum SongCatagory {
     Legacy(LegacyCat),
     LegacyExtention(LegacyExtCat),
     NewExtention(NewExtCat),
-    MusicCollab(String),
+    Collab(String),
     Others(String),
+}
+
+impl SongCatagory {
+    pub fn from(category: &str, idfinder: &str) -> Self {
+        match category {
+            "COLLABORATION" => Self::Collab(idfinder.to_owned()),
+            _ => match idfinder {
+                "R" => Self::Respect(RespectCat::Respect),
+                "P1" => Self::Legacy(LegacyCat::PortableOne),
+                "P2" => Self::Legacy(LegacyCat::PortableTwo),
+                "ES" => Self::LegacyExtention(LegacyExtCat::EmotionalSense),
+                "TR" => Self::LegacyExtention(LegacyExtCat::Trilogy),
+                "BS" => Self::LegacyExtention(LegacyExtCat::BlackSquare),
+                "CE" => Self::LegacyExtention(LegacyExtCat::Clazziquai),
+                "T3" => Self::LegacyExtention(LegacyExtCat::TechnikaThree),
+                "T2" => Self::LegacyExtention(LegacyExtCat::TechnikaTwo),
+                "T1" => Self::LegacyExtention(LegacyExtCat::TechnikaOne),
+                "P3" => Self::LegacyExtention(LegacyExtCat::PortableThree),
+                "TQ" => Self::LegacyExtention(LegacyExtCat::TechnikaTuneQ),
+                "VE" => Self::NewExtention(NewExtCat::VExtentionOne),
+                "VE2" => Self::NewExtention(NewExtCat::VExtentionTwo),
+                "VE3" => Self::NewExtention(NewExtCat::VExtentionThree),
+                "VE4" => Self::NewExtention(NewExtCat::VExtentionFour),
+                "VE5" => Self::NewExtention(NewExtCat::VExtentionFive),
+                "VL" => Self::NewExtention(NewExtCat::VLivertyOne),
+                "VL2" => Self::NewExtention(NewExtCat::VLivertyTwo),
+                _ => Self::Others(idfinder.to_owned()),
+            },
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -136,23 +165,59 @@ pub enum ButtonMode {
     Five,
     Six,
     Eight,
+    Other(u8),
+}
+
+impl ButtonMode {
+    fn from(button: u8) -> Self {
+        match button {
+            4 => ButtonMode::Four,
+            5 => ButtonMode::Five,
+            6 => ButtonMode::Six,
+            8 => ButtonMode::Eight,
+            b => ButtonMode::Other(b),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum ChartType {
+    Normal,
+    Hard,
+    Maximum,
+    Sc,
+    Other(String),
+}
+
+impl ChartType {
+    fn from(name: &str) -> Self {
+        match name {
+            "NM" => ChartType::Normal,
+            "HD" => ChartType::Hard,
+            "MX" => ChartType::Maximum,
+            "SC" => ChartType::Sc,
+            other => ChartType::Other(other.to_owned()),
+        }
+    }
 }
 
 /// A struct for user's record for a chart
 #[derive(Debug)]
-pub struct UserRecordForChart {
+pub struct UserChartRecord {
     /// ID number for a song of the chart
     pub song_id: usize,
     /// A song title for the chart
     pub title: String,
     /// A button type of the chart
     pub button: ButtonMode,
+    /// A difficulty type of the chart
+    pub chart_type: ChartType,
     /// A user's accuracy rate for the chart
     pub acc_rate: f64,
     /// user's max combo or not for the chart
     pub is_max_combo: bool,
     /// A level for the chart
-    pub level: u8,
+    pub chart_level: u8,
     /// A level on V-Archive's floor
     pub floor_level: f64,
     /// A user's rating on V-Archive for a chart
@@ -160,9 +225,336 @@ pub struct UserRecordForChart {
     /// A maximum rating on V-Archive for a chart
     pub maximum_rating: f64,
     /// A DJPOWER point for DJMAX. (This may differ from in-game.)
-    pub dj_power: f64,
+    pub dj_power: Option<f64>,
     /// A category for a song of the chart
-    pub song_cat: SongCatagory,
+    pub song_cat: Option<SongCatagory>,
+}
+
+impl UserChartRecord {
+    pub fn new() -> Self {
+        Self {
+            song_id: 0,
+            title: String::new(),
+            button: ButtonMode::Four,
+            chart_type: ChartType::Normal,
+            acc_rate: 0.0,
+            is_max_combo: false,
+            chart_level: 1,
+            floor_level: 0.0,
+            user_rating: 0.0,
+            maximum_rating: 0.0,
+            dj_power: None,
+            song_cat: None,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum Tier {
+    Beginner(u16),
+    AmateurIV(u16),
+    AmateurIII(u16),
+    AmateurII(u16),
+    AmateurI(u16),
+    IronIV(u16),
+    IronIII(u16),
+    IronII(u16),
+    IronI(u16),
+    BronzeIV(u16),
+    BronzeIII(u16),
+    BronzeII(u16),
+    BronzeI(u16),
+    SilverIV(u16),
+    SilverIII(u16),
+    SilverII(u16),
+    SilverI(u16),
+    GoldIV(u16),
+    GoldIII(u16),
+    GoldII(u16),
+    GoldI(u16),
+    PlatinumIV(u16),
+    PlatinumIII(u16),
+    PlatinumII(u16),
+    PlatinumI(u16),
+    DiamondIV(u16),
+    DiamondIII(u16),
+    DiamondII(u16),
+    DiamondI(u16),
+    MasterIII(u16),
+    MasterII(u16),
+    MasterI(u16),
+    GrandMaster(u16),
+}
+
+impl Tier {
+    pub fn new() -> Self {
+        Self::Beginner(0)
+    }
+
+    pub fn from(points: u16) -> Self {
+        match points {
+            0..=499 => Self::Beginner(points),
+            500..=999 => Self::AmateurIV(points),
+            1000..=1999 => Self::AmateurIII(points),
+            2000..=2999 => Self::AmateurII(points),
+            3000..=3999 => Self::AmateurI(points),
+            4000..=4299 => Self::IronIV(points),
+            4300..=4599 => Self::IronIII(points),
+            4600..=4899 => Self::IronII(points),
+            4900..=5299 => Self::IronI(points),
+            5300..=5649 => Self::BronzeIV(points),
+            5650..=5999 => Self::BronzeIII(points),
+            6000..=6299 => Self::BronzeII(points),
+            6300..=6599 => Self::BronzeI(points),
+            6600..=6799 => Self::SilverIV(points),
+            6800..=6999 => Self::SilverIII(points),
+            7000..=7199 => Self::SilverII(points),
+            7200..=7399 => Self::SilverI(points),
+            7400..=7599 => Self::GoldIV(points),
+            7600..=7799 => Self::GoldIII(points),
+            7800..=7999 => Self::GoldII(points),
+            8000..=8199 => Self::GoldI(points),
+            8200..=8399 => Self::PlatinumIV(points),
+            8400..=8599 => Self::PlatinumIII(points),
+            8600..=8799 => Self::PlatinumII(points),
+            8800..=8999 => Self::PlatinumI(points),
+            9000..=9199 => Self::DiamondIV(points),
+            9200..=9399 => Self::DiamondIII(points),
+            9400..=9599 => Self::DiamondII(points),
+            9600..=9699 => Self::DiamondI(points),
+            9700..=9799 => Self::MasterIII(points),
+            9800..=9899 => Self::MasterII(points),
+            9900..=9945 => Self::MasterI(points),
+            _ => Self::GrandMaster(points),
+        }
+    }
+
+    // pub fn next_tier(&self) -> Self {
+    //     match self {
+    //         Self::Beginner(_)=> Self::AmateurIV(500),
+    //         Self::AmateurIV(_)=> Self::AmateurIV(),
+    //         Self::AmateurIII(_)=> Self::IronIV(),
+    //         Self::AmateurII(_)=> Self::IronIV(),
+    //         Self::AmateurI(_)=> Self::IronIV(),
+    //         Self::IronIV(_)=> Self::IronIV(),
+    //         Self::IronIII(_)=> Self::IronIV(),
+    //         Self::IronII(_)=> Self::IronIV(),
+    //         Self::IronI(_)=> Self::IronIV(),
+    //         Self::BronzeIV(_)=> Self::IronIV(),
+    //         Self::BronzeIII(_)=> Self::IronIV(),
+    //         Self::BronzeII(_)=> Self::IronIV(),
+    //         Self::BronzeI(_)=> Self::IronIV(),
+    //         Self::SilverIV(_)=> Self::IronIV(),
+    //         Self::SilverIII(_)=> Self::IronIV(),
+    //         Self::SilverII(_)=> Self::IronIV(),
+    //         Self::SilverI(_)=> Self::IronIV(),
+    //         Self::GoldIV(_)=> Self::IronIV(),
+    //         Self::GoldIII(_)=> Self::IronIV(),
+    //         Self::GoldII(_)=> Self::IronIV(),
+    //         Self::GoldI(_)=> Self::IronIV(),
+    //         Self::PlatinumIV(_)=> Self::IronIV(),
+    //         Self::PlatinumIII(_)=> Self::IronIV(),
+    //         Self::PlatinumII(_)=> Self::IronIV(),
+    //         Self::PlatinumI(_)=> Self::IronIV(),
+    //         Self::DiamondIV(_)=> Self::IronIV(),
+    //         Self::DiamondIII(_)=> Self::IronIV(),
+    //         Self::DiamondII(_)=> Self::IronIV(),
+    //         Self::DiamondI(_)=> Self::IronIV(),
+    //         Self::MasterIII(_)=> Self::IronIV(),
+    //         Self::MasterII(_)=> Self::IronIV(),
+    //         Self::MasterI(_)=> Self::IronIV(),
+    //         Self::GrandMaster(_)=> Self::IronIV(),
+    //     }
+    // }
+}
+
+// impl fmt::Display for Tier {
+// fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+//     match self {
+//         Self::Beginner(_) => write!(f, "Beginner"),
+//         Self::AmateurIV(_) => write!(f, "Amateur IV"),
+//         Self::AmateurIII(_) => write!(f, "Amateur III"),
+//         Self::AmateurII(_) => Self::IronIV(),
+//         Self::AmateurI(_) => Self::IronIV(),
+//         Self::IronIV(_) => Self::IronIV(),
+//         Self::IronIII(_) => Self::IronIV(),
+//         Self::IronII(_) => Self::IronIV(),
+//         Self::IronI(_) => Self::IronIV(),
+//         Self::BronzeIV(_) => Self::IronIV(),
+//         Self::BronzeIII(_) => Self::IronIV(),
+//         Self::BronzeII(_) => Self::IronIV(),
+//         Self::BronzeI(_) => Self::IronIV(),
+//         Self::SilverIV(_) => Self::IronIV(),
+//         Self::SilverIII(_) => Self::IronIV(),
+//         Self::SilverII(_) => Self::IronIV(),
+//         Self::SilverI(_) => Self::IronIV(),
+//         Self::GoldIV(_) => Self::IronIV(),
+//         Self::GoldIII(_) => Self::IronIV(),
+//         Self::GoldII(_) => Self::IronIV(),
+//         Self::GoldI(_) => Self::IronIV(),
+//         Self::PlatinumIV(_) => Self::IronIV(),
+//         Self::PlatinumIII(_) => Self::IronIV(),
+//         Self::PlatinumII(_) => Self::IronIV(),
+//         Self::PlatinumI(_) => Self::IronIV(),
+//         Self::DiamondIV(_) => Self::IronIV(),
+//         Self::DiamondIII(_) => Self::IronIV(),
+//         Self::DiamondII(_) => Self::IronIV(),
+//         Self::DiamondI(_) => Self::IronIV(),
+//         Self::MasterIII(_) => Self::IronIV(),
+//         Self::MasterII(_) => Self::IronIV(),
+//         Self::MasterI(_) => Self::IronIV(),
+//         Self::GrandMaster(_) => Self::IronIV(),
+//     }
+// }
+// }
+
+// pub fn tier_diff(tier_a: Tier, tier_b: Tier) -> f64 {
+//     let point_a = tier_a.0 as f64;
+//     let point_b = tier_b.0 as f64;
+
+//     if point_a > point_b {
+//         point_a - point_b
+//     } else {
+//         point_b - point_a
+//     }
+// }
+
+/// A user's record table with V-Archive tier.
+#[derive(Debug)]
+pub struct UserTierRecordTable {
+    pub fifteen_sum: f64,
+    pub tier_point: f64,
+    pub current_tier: Tier,
+    pub next_tier: Tier,
+    pub top_records: Vec<UserChartRecord>,
+}
+
+impl UserTierRecordTable {
+    pub fn new() -> Self {
+        Self {
+            fifteen_sum: 0.0,
+            tier_point: 0.0,
+            current_tier: Tier::from(0),
+            next_tier: Tier::from(0),
+            top_records: Vec::new(),
+        }
+    }
+}
+
+fn load_user_tier_parse(parse_text: String) -> UserTierRecordTable {
+    #[derive(Deserialize)]
+    pub struct APITier {
+        pub rating: u32,
+        pub name: String,
+        pub code: String,
+    }
+
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct APIPlayRecord {
+        // ID number for a song of the chart
+        title: usize,
+        // A song title of the chart
+        name: String,
+        // A button type of the chart
+        button: u8,
+        // A difficulty type of the chart
+        pattern: String,
+        // A level number of the chart
+        level: u8,
+        // A floor level from V-Archive of the chart
+        floor: String,
+        // Maximum rating of the pattern
+        max_rating: String,
+        // The user's accuracy rate of the chart
+        score: String,
+        // The user's MAX COMBO
+        #[serde(deserialize_with = "as_bool")]
+        max_combo: bool,
+        // The user's rating of the chart
+        rating: String,
+    }
+
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct APIBody {
+        success: bool,
+        top50sum: f64,
+        tier_point: f64,
+        tier: APITier,
+        next: APITier,
+        top_list: Vec<APIPlayRecord>,
+    }
+
+    let api_body: APIBody = serde_json::from_str(&parse_text).unwrap();
+
+    let mut top_list: Vec<UserChartRecord> = Vec::new();
+    for record in api_body.top_list {
+        let mut user_record = UserChartRecord::new();
+
+        user_record.song_id = record.title;
+        user_record.title = record.name;
+        user_record.button = ButtonMode::from(record.button);
+        user_record.acc_rate = record.score.parse().unwrap();
+        user_record.is_max_combo = record.max_combo;
+        user_record.chart_level = record.level;
+        user_record.floor_level = record.floor.parse().unwrap();
+        user_record.user_rating = record.rating.parse().unwrap();
+        user_record.maximum_rating = record.rating.parse().unwrap();
+
+        top_list.push(user_record);
+    }
+
+    let mut user_record_table = UserTierRecordTable::new();
+
+    user_record_table.fifteen_sum = api_body.top50sum;
+    user_record_table.tier_point = api_body.tier_point;
+    user_record_table.current_tier = Tier::from(api_body.tier.rating as u16);
+    user_record_table.next_tier = Tier::from(api_body.next.rating as u16);
+    user_record_table.top_records = top_list;
+
+    user_record_table
+}
+
+/// Load a user's tier info from server
+/// ## Example
+/// ```rust
+/// # use v_archive_rs::load_user_tier;
+/// #
+/// # fn main() {
+/// # // Starts for showing code
+/// let username = "내꺼";
+/// let tier_record = load_user_tier(username, 6);
+///
+/// match tier_record {
+///     Ok(r) => {
+///         println!(
+///             "Success: {}'s Tier is {:?}",
+///             username,
+///             r.current_tier
+///         );
+///     }
+///     Err(e) => {
+///         println!("Load failed: {:?}", e);
+///     }
+/// }
+/// # // Ends for showing code
+/// # }
+/// ```
+pub fn load_user_tier(username: &str, buttons: u8) -> Result<UserTierRecordTable, APIError> {
+    let get_url = format!("https://v-archive.net/api/archive/{username}/tier/{buttons}");
+    let resp = ureq::get(&get_url)
+        .set("Content-Type", "application/json")
+        .call();
+
+    match resp {
+        Ok(resp) => {
+            let resp_str = resp.into_string().unwrap();
+            Ok(load_user_tier_parse(resp_str))
+        }
+        Err(Error::Status(code, resp)) => Err(catch_server_err(code, resp)),
+        Err(_) => Err(APIError::UnknownError),
+    }
 }
 
 /// This is a user's play result for a song. Legacy struct (which will be removed.)

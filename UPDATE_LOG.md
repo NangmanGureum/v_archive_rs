@@ -1,3 +1,7 @@
+* 0.8.0
+  * Add new `struct`: `UserTierRecordTable`
+  * Change `struct` name: `UserRecordForChart` -> `UserChartRecord`
+  * Add new function: `load_user_tier()`
 * 0.7.0
   * Remove `struct`: `VArchiveErr`
   * Add new `struct`: `UserRecordForChart` (for replace)
