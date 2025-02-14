@@ -1,3 +1,19 @@
+* 0.9.0
+  * Add new `struct`s
+    * `Tier`
+    * `UserFloorRecordBoard`
+    * `UserFloorRecord`
+  * Add new `enum`: `FloorBoardType`
+  * Remove `struct`s
+    * `VArchivePatternResult` (replaced to `UserChartRecord`)
+    * `VArchiveTier` (replaced to `Tier`)
+    * `VArchiveUserTierInfo`(replaced to `UserTierRecordTable`)
+    * `VArchiveFloorSongResult` (replaced to `UserChartRecord`)
+    * `VArchiveUserFloor` (replaced to `UserFloorRecord`)
+    * `VArciveUserBoard` (replaced to `UserFloorRecordBoard`)
+  * Add new functions
+    * `load_user_tier()`
+    * `load_user_floor_board()`
 * 0.8.0
   * Add new `struct`: `UserTierRecordTable`
   * Change `struct` name: `UserRecordForChart` -> `UserChartRecord`

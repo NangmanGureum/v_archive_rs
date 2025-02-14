@@ -7,13 +7,13 @@ This is Rust library for using [V-Archive](https://v-archive.net/). It uses [the
 
 ## Example
 ```rust
-use v_archive_rs::VArchiveUserTierInfo as UserTier;
+use v_archive_rs::load_user_tier;
 
 fn main() {
     let username = "내꺼";
-    let user_tier = UserTier::load_user_tier(username, 6).unwrap();
+    let user_tier = load_user_tier(username, 6).unwrap();
 
-    println!("{}'s tier is: {}", username, user_tier.tier.name);
+    println!("{}'s tier is: {}", username, user_tier.current_tier.to_string());
 }
 ```
 

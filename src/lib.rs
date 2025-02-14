@@ -1,7 +1,18 @@
 use serde::{Deserialize, Serialize};
 use serde_this_or_that::{as_bool, as_f64, as_u64};
+use std::convert::From;
 use std::fmt;
+use std::num::ParseIntError;
+use std::str::FromStr;
 use ureq::{Error, Response};
+
+/// An API raw struct for tier
+#[derive(Deserialize)]
+struct RawAPITier {
+    pub rating: u32,
+    pub name: String,
+    pub code: String,
+}
 
 /// This is using for a lot of errors from V-Archive sever. Mostly, it comes as `Result<_, APIError>`
 #[derive(Debug)]
@@ -23,16 +34,16 @@ pub enum APIError {
 impl fmt::Display for APIError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            APIError::CannotFindUser => write!(f, "Cannot find user"),
-            APIError::HasNoButtonRecord => write!(f, "Has no button record"),
-            APIError::CannotFindSong => write!(f, "Cannot find song"),
-            APIError::FoundSeveralSongs => write!(f, "Found several songs"),
-            APIError::CannotFoundChart => write!(f, "Cannot find chart"),
-            APIError::WrongParameter(m) => write!(f, "Wrong parameter(s): {}", m),
-            APIError::InernalServerError => write!(f, "Inernal server error"),
-            APIError::APIUnknownError(c, m) => write!(f, "Unknown API error: {}, {}", c, m),
-            APIError::HTTPErr(c) => write!(f, "HTTP error: {}", c),
-            APIError::UnknownError => write!(f, "Unknown"),
+            Self::CannotFindUser => write!(f, "Cannot find user"),
+            Self::HasNoButtonRecord => write!(f, "Has no button record"),
+            Self::CannotFindSong => write!(f, "Cannot find song"),
+            Self::FoundSeveralSongs => write!(f, "Found several songs"),
+            Self::CannotFoundChart => write!(f, "Cannot find chart"),
+            Self::WrongParameter(m) => write!(f, "Wrong parameter(s): {}", m),
+            Self::InernalServerError => write!(f, "Inernal server error"),
+            Self::APIUnknownError(c, m) => write!(f, "Unknown API error: {}, {}", c, m),
+            Self::HTTPErr(c) => write!(f, "HTTP error: {}", c),
+            Self::UnknownError => write!(f, "Unknown"),
         }
     }
 }
@@ -129,36 +140,34 @@ pub enum SongCatagory {
     Others(String),
 }
 
-impl SongCatagory {
-    pub fn from(category: &str, idfinder: &str) -> Self {
-        match category {
-            "COLLABORATION" => Self::Collab(idfinder.to_owned()),
-            _ => match idfinder {
-                "R" => Self::Respect(RespectCat::Respect),
-                "P1" => Self::Legacy(LegacyCat::PortableOne),
-                "P2" => Self::Legacy(LegacyCat::PortableTwo),
-                "ES" => Self::LegacyExtention(LegacyExtCat::EmotionalSense),
-                "TR" => Self::LegacyExtention(LegacyExtCat::Trilogy),
-                "BS" => Self::LegacyExtention(LegacyExtCat::BlackSquare),
-                "CE" => Self::LegacyExtention(LegacyExtCat::Clazziquai),
-                "T3" => Self::LegacyExtention(LegacyExtCat::TechnikaThree),
-                "T2" => Self::LegacyExtention(LegacyExtCat::TechnikaTwo),
-                "T1" => Self::LegacyExtention(LegacyExtCat::TechnikaOne),
-                "P3" => Self::LegacyExtention(LegacyExtCat::PortableThree),
-                "TQ" => Self::LegacyExtention(LegacyExtCat::TechnikaTuneQ),
-                "VE" => Self::NewExtention(NewExtCat::VExtentionOne),
-                "VE2" => Self::NewExtention(NewExtCat::VExtentionTwo),
-                "VE3" => Self::NewExtention(NewExtCat::VExtentionThree),
-                "VE4" => Self::NewExtention(NewExtCat::VExtentionFour),
-                "VE5" => Self::NewExtention(NewExtCat::VExtentionFive),
-                "VL" => Self::NewExtention(NewExtCat::VLivertyOne),
-                "VL2" => Self::NewExtention(NewExtCat::VLivertyTwo),
-                _ => Self::Others(idfinder.to_owned()),
-            },
+impl From<&str> for SongCatagory {
+    fn from(idfinder: &str) -> Self {
+        match idfinder {
+            "R" => Self::Respect(RespectCat::Respect),
+            "P1" => Self::Legacy(LegacyCat::PortableOne),
+            "P2" => Self::Legacy(LegacyCat::PortableTwo),
+            "ES" => Self::LegacyExtention(LegacyExtCat::EmotionalSense),
+            "TR" => Self::LegacyExtention(LegacyExtCat::Trilogy),
+            "BS" => Self::LegacyExtention(LegacyExtCat::BlackSquare),
+            "CE" => Self::LegacyExtention(LegacyExtCat::Clazziquai),
+            "T3" => Self::LegacyExtention(LegacyExtCat::TechnikaThree),
+            "T2" => Self::LegacyExtention(LegacyExtCat::TechnikaTwo),
+            "T1" => Self::LegacyExtention(LegacyExtCat::TechnikaOne),
+            "P3" => Self::LegacyExtention(LegacyExtCat::PortableThree),
+            "TQ" => Self::LegacyExtention(LegacyExtCat::TechnikaTuneQ),
+            "VE" => Self::NewExtention(NewExtCat::VExtentionOne),
+            "VE2" => Self::NewExtention(NewExtCat::VExtentionTwo),
+            "VE3" => Self::NewExtention(NewExtCat::VExtentionThree),
+            "VE4" => Self::NewExtention(NewExtCat::VExtentionFour),
+            "VE5" => Self::NewExtention(NewExtCat::VExtentionFive),
+            "VL" => Self::NewExtention(NewExtCat::VLivertyOne),
+            "VL2" => Self::NewExtention(NewExtCat::VLivertyTwo),
+            _ => Self::Others(idfinder.to_owned()),
         }
     }
 }
 
+#[repr(u8)]
 #[derive(Debug)]
 pub enum ButtonMode {
     Four,
@@ -169,13 +178,51 @@ pub enum ButtonMode {
 }
 
 impl ButtonMode {
+    pub fn new() -> Self {
+        Self::Four
+    }
+}
+
+impl From<u8> for ButtonMode {
     fn from(button: u8) -> Self {
         match button {
-            4 => ButtonMode::Four,
-            5 => ButtonMode::Five,
-            6 => ButtonMode::Six,
-            8 => ButtonMode::Eight,
-            b => ButtonMode::Other(b),
+            4 => Self::Four,
+            5 => Self::Five,
+            6 => Self::Six,
+            8 => Self::Eight,
+            b => Self::Other(b),
+        }
+    }
+}
+
+impl FromStr for ButtonMode {
+    type Err = ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, ParseIntError> {
+        match s {
+            "4" => Ok(Self::Four),
+            "5" => Ok(Self::Five),
+            "6" => Ok(Self::Six),
+            "8" => Ok(Self::Eight),
+            b => {
+                let parse_button = b.parse::<u8>();
+                match parse_button {
+                    Ok(n) => Ok(Self::Other(n)),
+                    Err(error) => Err(error),
+                }
+            }
+        }
+    }
+}
+
+impl fmt::Display for ButtonMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Four => write!(f, "4"),
+            Self::Five => write!(f, "5"),
+            Self::Six => write!(f, "6"),
+            Self::Eight => write!(f, "8"),
+            Self::Other(b) => write!(f, "{}", b),
         }
     }
 }
@@ -189,7 +236,7 @@ pub enum ChartType {
     Other(String),
 }
 
-impl ChartType {
+impl From<&str> for ChartType {
     fn from(name: &str) -> Self {
         match name {
             "NM" => ChartType::Normal,
@@ -213,17 +260,17 @@ pub struct UserChartRecord {
     /// A difficulty type of the chart
     pub chart_type: ChartType,
     /// A user's accuracy rate for the chart
-    pub acc_rate: f64,
+    pub acc_rate: Option<f64>,
     /// user's max combo or not for the chart
     pub is_max_combo: bool,
     /// A level for the chart
-    pub chart_level: u8,
+    pub chart_level: Option<u8>,
     /// A level on V-Archive's floor
     pub floor_level: f64,
     /// A user's rating on V-Archive for a chart
     pub user_rating: f64,
     /// A maximum rating on V-Archive for a chart
-    pub maximum_rating: f64,
+    pub maximum_rating: Option<f64>,
     /// A DJPOWER point for DJMAX. (This may differ from in-game.)
     pub dj_power: Option<f64>,
     /// A category for a song of the chart
@@ -237,12 +284,12 @@ impl UserChartRecord {
             title: String::new(),
             button: ButtonMode::Four,
             chart_type: ChartType::Normal,
-            acc_rate: 0.0,
+            acc_rate: None,
             is_max_combo: false,
-            chart_level: 1,
+            chart_level: None,
             floor_level: 0.0,
             user_rating: 0.0,
-            maximum_rating: 0.0,
+            maximum_rating: None,
             dj_power: None,
             song_cat: None,
         }
@@ -293,131 +340,82 @@ impl Tier {
 
     pub fn from(points: u16) -> Self {
         match points {
-            0..=499 => Self::Beginner(points),
-            500..=999 => Self::AmateurIV(points),
-            1000..=1999 => Self::AmateurIII(points),
-            2000..=2999 => Self::AmateurII(points),
-            3000..=3999 => Self::AmateurI(points),
-            4000..=4299 => Self::IronIV(points),
-            4300..=4599 => Self::IronIII(points),
-            4600..=4899 => Self::IronII(points),
-            4900..=5299 => Self::IronI(points),
-            5300..=5649 => Self::BronzeIV(points),
-            5650..=5999 => Self::BronzeIII(points),
-            6000..=6299 => Self::BronzeII(points),
-            6300..=6599 => Self::BronzeI(points),
-            6600..=6799 => Self::SilverIV(points),
-            6800..=6999 => Self::SilverIII(points),
-            7000..=7199 => Self::SilverII(points),
-            7200..=7399 => Self::SilverI(points),
-            7400..=7599 => Self::GoldIV(points),
-            7600..=7799 => Self::GoldIII(points),
-            7800..=7999 => Self::GoldII(points),
-            8000..=8199 => Self::GoldI(points),
-            8200..=8399 => Self::PlatinumIV(points),
-            8400..=8599 => Self::PlatinumIII(points),
-            8600..=8799 => Self::PlatinumII(points),
-            8800..=8999 => Self::PlatinumI(points),
-            9000..=9199 => Self::DiamondIV(points),
-            9200..=9399 => Self::DiamondIII(points),
-            9400..=9599 => Self::DiamondII(points),
-            9600..=9699 => Self::DiamondI(points),
-            9700..=9799 => Self::MasterIII(points),
-            9800..=9899 => Self::MasterII(points),
-            9900..=9945 => Self::MasterI(points),
-            _ => Self::GrandMaster(points),
+            0..=499 => Self::Beginner(0),
+            500..=999 => Self::AmateurIV(500),
+            1000..=1999 => Self::AmateurIII(1000),
+            2000..=2999 => Self::AmateurII(2000),
+            3000..=3999 => Self::AmateurI(3000),
+            4000..=4299 => Self::IronIV(4000),
+            4300..=4599 => Self::IronIII(4300),
+            4600..=4899 => Self::IronII(4600),
+            4900..=5299 => Self::IronI(4900),
+            5300..=5649 => Self::BronzeIV(5300),
+            5650..=5999 => Self::BronzeIII(5650),
+            6000..=6299 => Self::BronzeII(6000),
+            6300..=6599 => Self::BronzeI(6300),
+            6600..=6799 => Self::SilverIV(6600),
+            6800..=6999 => Self::SilverIII(6800),
+            7000..=7199 => Self::SilverII(7000),
+            7200..=7399 => Self::SilverI(7200),
+            7400..=7599 => Self::GoldIV(7400),
+            7600..=7799 => Self::GoldIII(7600),
+            7800..=7999 => Self::GoldII(7800),
+            8000..=8199 => Self::GoldI(8000),
+            8200..=8399 => Self::PlatinumIV(8200),
+            8400..=8599 => Self::PlatinumIII(8400),
+            8600..=8799 => Self::PlatinumII(8600),
+            8800..=8999 => Self::PlatinumI(8800),
+            9000..=9199 => Self::DiamondIV(9000),
+            9200..=9399 => Self::DiamondIII(9200),
+            9400..=9599 => Self::DiamondII(9400),
+            9600..=9699 => Self::DiamondI(9600),
+            9700..=9799 => Self::MasterIII(9700),
+            9800..=9899 => Self::MasterII(9800),
+            9900..=9945 => Self::MasterI(9900),
+            _ => Self::GrandMaster(9950),
         }
     }
-
-    // pub fn next_tier(&self) -> Self {
-    //     match self {
-    //         Self::Beginner(_)=> Self::AmateurIV(500),
-    //         Self::AmateurIV(_)=> Self::AmateurIV(),
-    //         Self::AmateurIII(_)=> Self::IronIV(),
-    //         Self::AmateurII(_)=> Self::IronIV(),
-    //         Self::AmateurI(_)=> Self::IronIV(),
-    //         Self::IronIV(_)=> Self::IronIV(),
-    //         Self::IronIII(_)=> Self::IronIV(),
-    //         Self::IronII(_)=> Self::IronIV(),
-    //         Self::IronI(_)=> Self::IronIV(),
-    //         Self::BronzeIV(_)=> Self::IronIV(),
-    //         Self::BronzeIII(_)=> Self::IronIV(),
-    //         Self::BronzeII(_)=> Self::IronIV(),
-    //         Self::BronzeI(_)=> Self::IronIV(),
-    //         Self::SilverIV(_)=> Self::IronIV(),
-    //         Self::SilverIII(_)=> Self::IronIV(),
-    //         Self::SilverII(_)=> Self::IronIV(),
-    //         Self::SilverI(_)=> Self::IronIV(),
-    //         Self::GoldIV(_)=> Self::IronIV(),
-    //         Self::GoldIII(_)=> Self::IronIV(),
-    //         Self::GoldII(_)=> Self::IronIV(),
-    //         Self::GoldI(_)=> Self::IronIV(),
-    //         Self::PlatinumIV(_)=> Self::IronIV(),
-    //         Self::PlatinumIII(_)=> Self::IronIV(),
-    //         Self::PlatinumII(_)=> Self::IronIV(),
-    //         Self::PlatinumI(_)=> Self::IronIV(),
-    //         Self::DiamondIV(_)=> Self::IronIV(),
-    //         Self::DiamondIII(_)=> Self::IronIV(),
-    //         Self::DiamondII(_)=> Self::IronIV(),
-    //         Self::DiamondI(_)=> Self::IronIV(),
-    //         Self::MasterIII(_)=> Self::IronIV(),
-    //         Self::MasterII(_)=> Self::IronIV(),
-    //         Self::MasterI(_)=> Self::IronIV(),
-    //         Self::GrandMaster(_)=> Self::IronIV(),
-    //     }
-    // }
 }
 
-// impl fmt::Display for Tier {
-// fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-//     match self {
-//         Self::Beginner(_) => write!(f, "Beginner"),
-//         Self::AmateurIV(_) => write!(f, "Amateur IV"),
-//         Self::AmateurIII(_) => write!(f, "Amateur III"),
-//         Self::AmateurII(_) => Self::IronIV(),
-//         Self::AmateurI(_) => Self::IronIV(),
-//         Self::IronIV(_) => Self::IronIV(),
-//         Self::IronIII(_) => Self::IronIV(),
-//         Self::IronII(_) => Self::IronIV(),
-//         Self::IronI(_) => Self::IronIV(),
-//         Self::BronzeIV(_) => Self::IronIV(),
-//         Self::BronzeIII(_) => Self::IronIV(),
-//         Self::BronzeII(_) => Self::IronIV(),
-//         Self::BronzeI(_) => Self::IronIV(),
-//         Self::SilverIV(_) => Self::IronIV(),
-//         Self::SilverIII(_) => Self::IronIV(),
-//         Self::SilverII(_) => Self::IronIV(),
-//         Self::SilverI(_) => Self::IronIV(),
-//         Self::GoldIV(_) => Self::IronIV(),
-//         Self::GoldIII(_) => Self::IronIV(),
-//         Self::GoldII(_) => Self::IronIV(),
-//         Self::GoldI(_) => Self::IronIV(),
-//         Self::PlatinumIV(_) => Self::IronIV(),
-//         Self::PlatinumIII(_) => Self::IronIV(),
-//         Self::PlatinumII(_) => Self::IronIV(),
-//         Self::PlatinumI(_) => Self::IronIV(),
-//         Self::DiamondIV(_) => Self::IronIV(),
-//         Self::DiamondIII(_) => Self::IronIV(),
-//         Self::DiamondII(_) => Self::IronIV(),
-//         Self::DiamondI(_) => Self::IronIV(),
-//         Self::MasterIII(_) => Self::IronIV(),
-//         Self::MasterII(_) => Self::IronIV(),
-//         Self::MasterI(_) => Self::IronIV(),
-//         Self::GrandMaster(_) => Self::IronIV(),
-//     }
-// }
-// }
-
-// pub fn tier_diff(tier_a: Tier, tier_b: Tier) -> f64 {
-//     let point_a = tier_a.0 as f64;
-//     let point_b = tier_b.0 as f64;
-
-//     if point_a > point_b {
-//         point_a - point_b
-//     } else {
-//         point_b - point_a
-//     }
-// }
+impl fmt::Display for Tier {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Beginner(_) => write!(f, "Beginner"),
+            Self::AmateurIV(_) => write!(f, "Amateur IV"),
+            Self::AmateurIII(_) => write!(f, "Amateur III"),
+            Self::AmateurII(_) => write!(f, "Amateur II"),
+            Self::AmateurI(_) => write!(f, "Amateur I"),
+            Self::IronIV(_) => write!(f, "Iron IV"),
+            Self::IronIII(_) => write!(f, "Iron III"),
+            Self::IronII(_) => write!(f, "Iron II"),
+            Self::IronI(_) => write!(f, "Iron I"),
+            Self::BronzeIV(_) => write!(f, "Bronze IV"),
+            Self::BronzeIII(_) => write!(f, "Bronze III"),
+            Self::BronzeII(_) => write!(f, "Bronze II"),
+            Self::BronzeI(_) => write!(f, "Bronze I"),
+            Self::SilverIV(_) => write!(f, "Silver IV"),
+            Self::SilverIII(_) => write!(f, "Silver III"),
+            Self::SilverII(_) => write!(f, "Silver II"),
+            Self::SilverI(_) => write!(f, "Silver I"),
+            Self::GoldIV(_) => write!(f, "Gold IV"),
+            Self::GoldIII(_) => write!(f, "Gold III"),
+            Self::GoldII(_) => write!(f, "Gold II"),
+            Self::GoldI(_) => write!(f, "Gold I"),
+            Self::PlatinumIV(_) => write!(f, "Platinum IV"),
+            Self::PlatinumIII(_) => write!(f, "Platinum III"),
+            Self::PlatinumII(_) => write!(f, "Platinum II"),
+            Self::PlatinumI(_) => write!(f, "Platinum I"),
+            Self::DiamondIV(_) => write!(f, "Diamond IV"),
+            Self::DiamondIII(_) => write!(f, "Diamond III"),
+            Self::DiamondII(_) => write!(f, "Diamond II"),
+            Self::DiamondI(_) => write!(f, "Diamond I"),
+            Self::MasterIII(_) => write!(f, "Master III"),
+            Self::MasterII(_) => write!(f, "Master II"),
+            Self::MasterI(_) => write!(f, "Master I"),
+            Self::GrandMaster(_) => write!(f, "Grand Master"),
+        }
+    }
+}
 
 /// A user's record table with V-Archive tier.
 #[derive(Debug)]
@@ -443,13 +441,6 @@ impl UserTierRecordTable {
 
 fn load_user_tier_parse(parse_text: String) -> UserTierRecordTable {
     #[derive(Deserialize)]
-    pub struct APITier {
-        pub rating: u32,
-        pub name: String,
-        pub code: String,
-    }
-
-    #[derive(Deserialize)]
     #[serde(rename_all = "camelCase")]
     struct APIPlayRecord {
         // ID number for a song of the chart
@@ -467,7 +458,7 @@ fn load_user_tier_parse(parse_text: String) -> UserTierRecordTable {
         // Maximum rating of the pattern
         max_rating: String,
         // The user's accuracy rate of the chart
-        score: String,
+        score: Option<String>,
         // The user's MAX COMBO
         #[serde(deserialize_with = "as_bool")]
         max_combo: bool,
@@ -481,8 +472,8 @@ fn load_user_tier_parse(parse_text: String) -> UserTierRecordTable {
         success: bool,
         top50sum: f64,
         tier_point: f64,
-        tier: APITier,
-        next: APITier,
+        tier: RawAPITier,
+        next: RawAPITier,
         top_list: Vec<APIPlayRecord>,
     }
 
@@ -495,12 +486,17 @@ fn load_user_tier_parse(parse_text: String) -> UserTierRecordTable {
         user_record.song_id = record.title;
         user_record.title = record.name;
         user_record.button = ButtonMode::from(record.button);
-        user_record.acc_rate = record.score.parse().unwrap();
+        user_record.chart_type = ChartType::from(record.pattern.as_str());
         user_record.is_max_combo = record.max_combo;
-        user_record.chart_level = record.level;
+        user_record.chart_level = Some(record.level);
         user_record.floor_level = record.floor.parse().unwrap();
         user_record.user_rating = record.rating.parse().unwrap();
-        user_record.maximum_rating = record.rating.parse().unwrap();
+        user_record.maximum_rating = Some(record.max_rating.parse().unwrap());
+
+        user_record.acc_rate = match record.score {
+            None => None,
+            Some(s) => Some(s.parse().unwrap()),
+        };
 
         top_list.push(user_record);
     }
@@ -529,9 +525,9 @@ fn load_user_tier_parse(parse_text: String) -> UserTierRecordTable {
 /// match tier_record {
 ///     Ok(r) => {
 ///         println!(
-///             "Success: {}'s Tier is {:?}",
+///             "Success: {}'s Tier is {}",
 ///             username,
-///             r.current_tier
+///             r.current_tier.to_string()
 ///         );
 ///     }
 ///     Err(e) => {
@@ -557,171 +553,269 @@ pub fn load_user_tier(username: &str, buttons: u8) -> Result<UserTierRecordTable
     }
 }
 
-/// This is a user's play result for a song. Legacy struct (which will be removed.)
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct VArchivePatternResult {
-    /// ID number for a song of the pattern
-    pub title: usize,
-    /// A song title of the pattern
-    pub name: String,
-    /// A button type of the pattern
-    pub button: u8,
-    /// A difficulty type of the pattern
-    pub pattern: String,
-    /// A level number of the pattern
-    pub level: u8,
-    /// A floor level from V-Archive of the pattern
-    #[serde(deserialize_with = "as_f64")]
-    pub floor: f64,
-    /// Maximum rating of the pattern
-    #[serde(deserialize_with = "as_f64")]
-    pub max_rating: f64,
-    /// The user's accuracy rate of the pattern
-    #[serde(deserialize_with = "as_f64")]
-    pub score: f64,
-    /// The user's MAX COMBO
-    #[serde(deserialize_with = "as_bool")]
-    pub max_combo: bool,
-    /// The user's rating of the pattern
-    #[serde(deserialize_with = "as_f64")]
-    pub rating: f64,
+#[derive(Debug)]
+pub struct UserFloorRecord {
+    /// A number of floor
+    pub floor_number: f64,
+    /// A bunch of records
+    pub records: Vec<UserChartRecord>,
 }
 
-impl VArchivePatternResult {
-    pub fn new() -> Self {
-        VArchivePatternResult {
-            title: 0,
-            name: String::new(),
-            button: 4,
-            pattern: String::from("NM"),
-            level: 1,
-            floor: 0.0,
-            max_rating: 0.0,
-            score: 0.0,
-            max_combo: false,
-            rating: 0.0,
-        }
-    }
-}
-
-/// This is a tier. Legacy struct (which will be removed.)
-#[derive(Serialize, Deserialize, Debug)]
-pub struct VArchiveTier {
-    pub rating: u32,
-    pub name: String,
-    pub code: String,
-}
-
-impl VArchiveTier {
+impl UserFloorRecord {
     pub fn new() -> Self {
         Self {
-            rating: 0,
-            name: String::from("Beginner"),
-            code: String::from("BG"),
+            floor_number: 0.0,
+            records: Vec::new(),
         }
     }
+}
 
-    /// Make a tier via server.
-    pub fn from_point(tier_point: u32) -> Self {
-        let req_result = ureq::get("https://v-archive.net/db/tiers.json").call();
-        if let Ok(resp) = req_result {
-            // If get tier list
+/// Types of user's record floor board.
+#[derive(Debug)]
+pub enum FloorBoardType {
+    One,
+    Two,
+    Three,
+    Four,
+    Five,
+    Six,
+    Seven,
+    Eight,
+    Nine,
+    Ten,
+    Eleven,
+    Maximum,
+    Sc,
+    ScFive,
+    ScTen,
+    ScFifteen,
+    Djpower,
+    Others(String),
+}
+
+impl FloorBoardType {
+    pub fn new() -> Self {
+        FloorBoardType::One
+    }
+}
+
+impl From<&str> for FloorBoardType {
+    fn from(idfinder: &str) -> Self {
+        match idfinder {
+            "1" => Self::One,
+            "2" => Self::Two,
+            "3" => Self::Three,
+            "4" => Self::Four,
+            "5" => Self::Five,
+            "6" => Self::Six,
+            "7" => Self::Seven,
+            "8" => Self::Eight,
+            "9" => Self::Nine,
+            "10" => Self::Ten,
+            "11" => Self::Eleven,
+            "MX" => Self::Maximum,
+            "SC" => Self::Sc,
+            "SC5" => Self::ScFive,
+            "SC10" => Self::ScTen,
+            "SC15" => Self::ScFifteen,
+            "DJPOWER" => Self::Djpower,
+            _ => Self::Others(idfinder.to_owned()),
+        }
+    }
+}
+
+impl From<usize> for FloorBoardType {
+    fn from(index: usize) -> Self {
+        match index {
+            0 => Self::One,
+            1 => Self::Two,
+            2 => Self::Three,
+            3 => Self::Four,
+            4 => Self::Five,
+            5 => Self::Six,
+            6 => Self::Seven,
+            7 => Self::Eight,
+            8 => Self::Nine,
+            9 => Self::Ten,
+            10 => Self::Eleven,
+            11 => Self::Maximum,
+            12 => Self::Sc,
+            13 => Self::ScFive,
+            14 => Self::ScTen,
+            15 => Self::ScFifteen,
+            16 => Self::Djpower,
+            _ => Self::Others(index.to_string()),
+        }
+    }
+}
+
+impl fmt::Display for FloorBoardType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::One => write!(f, "1"),
+            Self::Two => write!(f, "2"),
+            Self::Three => write!(f, "3"),
+            Self::Four => write!(f, "4"),
+            Self::Five => write!(f, "5"),
+            Self::Six => write!(f, "6"),
+            Self::Seven => write!(f, "7"),
+            Self::Eight => write!(f, "8"),
+            Self::Nine => write!(f, "9"),
+            Self::Ten => write!(f, "10"),
+            Self::Eleven => write!(f, "11"),
+            Self::Maximum => write!(f, "MX"),
+            Self::Sc => write!(f, "SC"),
+            Self::ScFive => write!(f, "SC5"),
+            Self::ScTen => write!(f, "SC10"),
+            Self::ScFifteen => write!(f, "SC15"),
+            Self::Djpower => write!(f, "DJPOWER"),
+            Self::Others(t) => write!(f, "{}", t),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct UserFloorRecordBoard {
+    /// A type of the board
+    pub board_type: FloorBoardType,
+    /// A button type of the board
+    pub button: ButtonMode,
+    /// Numbers of records on the board
+    pub total_count: usize,
+    /// List of floors with records
+    pub floors: Vec<UserFloorRecord>,
+}
+
+impl UserFloorRecordBoard {
+    pub fn new() -> Self {
+        Self {
+            board_type: FloorBoardType::new(),
+            button: ButtonMode::new(),
+            total_count: 0,
+            floors: Vec::new(),
+        }
+    }
+}
+
+fn user_floor_board_parse(parse_text: String) -> UserFloorRecordBoard {
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct APIPlayRecord {
+        title: usize,
+        name: String,
+        composer: String,
+        pattern: String,
+        score: Option<String>,
+        #[serde(deserialize_with = "as_bool")]
+        max_combo: bool,
+        djpower: f64,
+        rating: f64,
+        dlc: String,
+        dlc_code: String,
+    }
+
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct APIFloorLevel {
+        floor_number: f64,
+        patterns: Vec<APIPlayRecord>,
+    }
+
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct APIBody {
+        success: bool,
+        board: String,
+        button: String,
+        total_count: usize,
+        floors: Vec<APIFloorLevel>,
+    }
+
+    let api_body: APIBody = serde_json::from_str(&parse_text).unwrap();
+
+    let mut floors = Vec::new();
+
+    for api_floor in api_body.floors {
+        let mut floor = UserFloorRecord::new();
+        floor.floor_number = api_floor.floor_number;
+
+        let mut user_records = Vec::new();
+
+        for record in api_floor.patterns {
+            let mut user_record = UserChartRecord::new();
+
+            user_record.song_id = record.title;
+            user_record.title = record.name;
+            user_record.button = ButtonMode::from_str(&api_body.button).unwrap();
+            user_record.chart_type = ChartType::from(record.pattern.as_str());
+            user_record.is_max_combo = record.max_combo;
+            user_record.floor_level = api_floor.floor_number;
+            user_record.user_rating = record.rating;
+            user_record.dj_power = Some(record.djpower);
+            user_record.song_cat = Some(SongCatagory::from(record.dlc_code.as_str()));
+
+            user_record.acc_rate = match record.score {
+                None => None,
+                Some(s) => Some(s.parse().unwrap()),
+            };
+
+            user_records.push(user_record);
+        }
+        floor.records = user_records;
+
+        floors.push(floor);
+    }
+
+    let mut floor_board = UserFloorRecordBoard::new();
+    floor_board.board_type = FloorBoardType::from(api_body.board.as_str());
+    floor_board.button = ButtonMode::from_str(&api_body.button).unwrap();
+    floor_board.total_count = api_body.total_count;
+    floor_board.floors = floors;
+
+    floor_board
+}
+
+/// Load a user's floor board from server
+/// ## Example
+/// ```rust
+/// # use v_archive_rs::load_user_floor_board;
+/// #
+/// # fn main() {
+/// # // Starts for showing code
+/// let username = "내꺼";
+/// let floor_board = load_user_floor_board(username, 6, "MX");
+///
+/// match floor_board {
+///     Ok(b) => {
+///         println!("Board type: {}", b.board_type.to_string());
+///         println!("Board buttons mode: {} buttons", b.button.to_string());
+///         println!("Board total count: {}", b.total_count);
+///     }
+///     Err(e) => {
+///         println!("Load failed: {:?}", e);
+///     }
+/// }
+/// # // Ends for showing code
+/// # }
+/// ```
+pub fn load_user_floor_board(
+    username: &str,
+    buttons: u8,
+    board_type: &str,
+) -> Result<UserFloorRecordBoard, APIError> {
+    let get_url =
+        format!("https://v-archive.net/api/archive/{username}/board/{buttons}/{board_type}");
+    let resp = ureq::get(&get_url)
+        .set("Content-Type", "application/json")
+        .call();
+
+    match resp {
+        Ok(resp) => {
             let resp_str = resp.into_string().unwrap();
-            let tier_list: Vec<Self> = serde_json::from_str(&resp_str).unwrap();
-
-            for tier in tier_list {
-                if tier_point >= tier.rating {
-                    return tier;
-                }
-            }
-
-            return Self::new();
-        } else {
-            // If cannot tier list
-            Self {
-                rating: 0,
-                name: String::from("Load Error"),
-                code: String::from("ER"),
-            }
+            Ok(user_floor_board_parse(resp_str))
         }
-    }
-}
-
-/// This is a user's tier table. Legacy struct (which will be removed.)
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct VArchiveUserTierInfo {
-    success: bool,
-    #[serde(deserialize_with = "as_f64")]
-    pub top50sum: f64,
-    #[serde(deserialize_with = "as_f64")]
-    pub tier_point: f64,
-    pub tier: VArchiveTier,
-    pub next: VArchiveTier,
-    pub top_list: Vec<VArchivePatternResult>,
-}
-
-impl VArchiveUserTierInfo {
-    pub fn new() -> Self {
-        Self {
-            success: true,
-            top50sum: 0.0,
-            tier_point: 0.0,
-            tier: VArchiveTier::new(),
-            next: VArchiveTier::new(),
-            top_list: Vec::new(),
-        }
-    }
-
-    pub fn current_tier_diff(&self) -> f64 {
-        self.tier_point - (self.tier.rating as f64)
-    }
-
-    pub fn next_tier_diff(&self) -> f64 {
-        self.next.rating as f64 - self.tier_point
-    }
-
-    /// Load a user's tier info from server
-    /// ## Example
-    /// ```rust
-    /// # use v_archive_rs::VArchiveUserTierInfo;
-    /// #
-    /// # fn main() {
-    /// # // Starts for showing code
-    /// let username = "내꺼";
-    /// let user_tier = VArchiveUserTierInfo::load_user_tier(username, 6);
-    ///
-    /// match user_tier {
-    ///     Ok(tier) => {
-    ///         println!(
-    ///             "Success: {}'s Tier is {}(+{})",
-    ///             username,
-    ///             tier.tier.name,
-    ///             tier.current_tier_diff()
-    ///         );
-    ///     }
-    ///     Err(e) => {
-    ///         println!("Load failed: {:?}", e);
-    ///     }
-    /// }
-    /// # // Ends for showing code
-    /// # }
-    /// ```
-    pub fn load_user_tier(username: &str, buttons: u8) -> Result<Self, APIError> {
-        let get_url = format!("https://v-archive.net/api/archive/{username}/tier/{buttons}");
-        let resp = ureq::get(&get_url)
-            .set("Content-Type", "application/json")
-            .call();
-
-        match resp {
-            Ok(resp) => {
-                let resp_str = resp.into_string().unwrap();
-                Ok(serde_json::from_str(&resp_str).unwrap())
-            }
-            Err(Error::Status(code, resp)) => Err(catch_server_err(code, resp)),
-            Err(_) => Err(APIError::UnknownError),
-        }
+        Err(Error::Status(code, resp)) => Err(catch_server_err(code, resp)),
+        Err(_) => Err(APIError::UnknownError),
     }
 }
 
@@ -849,103 +943,103 @@ impl VArchiveSongUserResult {
     }
 }
 
-/// Legacy struct (which will be removed.)
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct VArchiveFloorSongResult {
-    pub title: usize,
-    pub name: String,
-    pub composer: String,
-    pub pattern: String,
-    #[serde(deserialize_with = "as_f64")]
-    pub score: f64,
-    #[serde(deserialize_with = "as_bool")]
-    pub max_combo: bool,
-    pub djpower: f64,
-    pub rating: f64,
-    pub dlc: String,
-    pub dlc_code: String,
-}
+// /// Legacy struct (which will be removed.)
+// #[derive(Serialize, Deserialize, Debug)]
+// #[serde(rename_all = "camelCase")]
+// pub struct VArchiveFloorSongResult {
+//     pub title: usize,
+//     pub name: String,
+//     pub composer: String,
+//     pub pattern: String,
+//     #[serde(deserialize_with = "as_f64")]
+//     pub score: f64,
+//     #[serde(deserialize_with = "as_bool")]
+//     pub max_combo: bool,
+//     pub djpower: f64,
+//     pub rating: f64,
+//     pub dlc: String,
+//     pub dlc_code: String,
+// }
 
-impl VArchiveFloorSongResult {
-    pub fn new() -> Self {
-        Self {
-            title: 0,
-            name: String::new(),
-            composer: String::new(),
-            pattern: String::new(),
-            score: 0.0,
-            max_combo: false,
-            djpower: 0.0,
-            rating: 0.0,
-            dlc: String::new(),
-            dlc_code: String::new(),
-        }
-    }
-}
+// impl VArchiveFloorSongResult {
+//     pub fn new() -> Self {
+//         Self {
+//             title: 0,
+//             name: String::new(),
+//             composer: String::new(),
+//             pattern: String::new(),
+//             score: 0.0,
+//             max_combo: false,
+//             djpower: 0.0,
+//             rating: 0.0,
+//             dlc: String::new(),
+//             dlc_code: String::new(),
+//         }
+//     }
+// }
 
-/// Legacy struct (which will be removed.)
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct VArchiveUserFloor {
-    pub floor_number: f64,
-    pub patterns: Vec<VArchiveFloorSongResult>,
-}
+// /// Legacy struct (which will be removed.)
+// #[derive(Serialize, Deserialize, Debug)]
+// #[serde(rename_all = "camelCase")]
+// pub struct VArchiveUserFloor {
+//     pub floor_number: f64,
+//     pub patterns: Vec<VArchiveFloorSongResult>,
+// }
 
-impl VArchiveUserFloor {
-    pub fn new() -> Self {
-        Self {
-            floor_number: 0.0,
-            patterns: Vec::new(),
-        }
-    }
-}
+// impl VArchiveUserFloor {
+//     pub fn new() -> Self {
+//         Self {
+//             floor_number: 0.0,
+//             patterns: Vec::new(),
+//         }
+//     }
+// }
 
-/// Legacy struct (which will be removed.)
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct VArciveUserBoard {
-    success: bool,
-    #[serde(alias = "board")]
-    pub board_type: String,
-    #[serde(deserialize_with = "as_u64")]
-    pub button: u64,
-    pub total_count: usize,
-    pub floors: Vec<VArchiveUserFloor>,
-}
+// /// Legacy struct (which will be removed.)
+// #[derive(Serialize, Deserialize, Debug)]
+// #[serde(rename_all = "camelCase")]
+// pub struct VArciveUserBoard {
+//     success: bool,
+//     #[serde(alias = "board")]
+//     pub board_type: String,
+//     #[serde(deserialize_with = "as_u64")]
+//     pub button: u64,
+//     pub total_count: usize,
+//     pub floors: Vec<VArchiveUserFloor>,
+// }
 
-impl VArciveUserBoard {
-    pub fn new() -> Self {
-        Self {
-            success: true,
-            board_type: String::new(),
-            button: 4,
-            total_count: 0,
-            floors: Vec::new(),
-        }
-    }
+// impl VArciveUserBoard {
+//     pub fn new() -> Self {
+//         Self {
+//             success: true,
+//             board_type: String::new(),
+//             button: 4,
+//             total_count: 0,
+//             floors: Vec::new(),
+//         }
+//     }
 
-    pub fn load_user_board(
-        username: &str,
-        buttons: &u8,
-        board_type: &str,
-    ) -> Result<Self, APIError> {
-        let get_url =
-            format!("https://v-archive.net/api/archive/{username}/board/{buttons}/{board_type}");
-        let resp = ureq::get(&get_url)
-            .set("Content-Type", "application/json")
-            .call();
+//     pub fn load_user_board(
+//         username: &str,
+//         buttons: &u8,
+//         board_type: &str,
+//     ) -> Result<Self, APIError> {
+//         let get_url =
+//             format!("https://v-archive.net/api/archive/{username}/board/{buttons}/{board_type}");
+//         let resp = ureq::get(&get_url)
+//             .set("Content-Type", "application/json")
+//             .call();
 
-        match resp {
-            Ok(resp) => {
-                let resp_str = resp.into_string().unwrap();
-                Ok(serde_json::from_str(&resp_str).unwrap())
-            }
-            Err(Error::Status(code, resp)) => Err(catch_server_err(code, resp)),
-            Err(_) => Err(APIError::UnknownError),
-        }
-    }
-}
+//         match resp {
+//             Ok(resp) => {
+//                 let resp_str = resp.into_string().unwrap();
+//                 Ok(serde_json::from_str(&resp_str).unwrap())
+//             }
+//             Err(Error::Status(code, resp)) => Err(catch_server_err(code, resp)),
+//             Err(_) => Err(APIError::UnknownError),
+//         }
+//     }
+// }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct VArchiveRegisterResult {
@@ -1082,13 +1176,25 @@ pub fn all_songs() -> Result<Vec<VArchiveSong>, APIError> {
     }
 }
 
-pub fn tier_list() -> Result<Vec<VArchiveTier>, APIError> {
+fn tier_list_parse(parse_text: String) -> Vec<Tier> {
+    let api_tier_list: Vec<RawAPITier> = serde_json::from_str(&parse_text).unwrap();
+    let mut tier_list: Vec<Tier> = Vec::new();
+
+    for t in api_tier_list {
+        let tier_converted = Tier::from(t.rating as u16);
+        tier_list.push(tier_converted);
+    }
+
+    tier_list
+}
+
+pub fn tier_list() -> Result<Vec<Tier>, APIError> {
     let resp = ureq::get("https://v-archive.net/db/tiers.json").call();
 
     match resp {
         Ok(resp) => {
             let resp_str = resp.into_string().unwrap();
-            Ok(serde_json::from_str(&resp_str).unwrap())
+            Ok(tier_list_parse(resp_str))
         }
         Err(Error::Status(code, resp)) => Err(catch_server_err(code, resp)),
         Err(_) => Err(APIError::UnknownError),
@@ -1116,7 +1222,7 @@ mod tests {
     fn not_available_buttons() {
         // Loading tier info; as "10" buttons(which is **not available**) tier on DEV
         let example_username = "DEV";
-        let load_user_tier = VArchiveUserTierInfo::load_user_tier(example_username, 10);
+        let load_user_tier = load_user_tier(example_username, 10);
 
         match load_user_tier {
             Ok(_) => {
@@ -1139,7 +1245,7 @@ mod tests {
     fn check_no_data() {
         // Loading tier info; as 4 buttons tier on "no_data"
         let example_username = "no_data";
-        let load_user_tier = VArchiveUserTierInfo::load_user_tier(&example_username, 4);
+        let load_user_tier = load_user_tier(&example_username, 4);
 
         match load_user_tier {
             Ok(_) => {
@@ -1160,7 +1266,7 @@ mod tests {
     fn check_no_user() {
         // Loading tier info; as 4 buttons tier on "no_account"
         let example_username = "no_account";
-        let load_user_tier = VArchiveUserTierInfo::load_user_tier(&example_username, 4);
+        let load_user_tier = load_user_tier(&example_username, 4);
 
         match load_user_tier {
             Ok(_) => {
@@ -1178,25 +1284,30 @@ mod tests {
     #[test]
     fn tier_convert() {
         let tier_point = 7028;
-        let tier = VArchiveTier::from_point(tier_point);
+        let tier = Tier::from(tier_point);
 
-        assert_eq!(tier.rating, 7000);
-        assert_eq!(tier.name, "Silver II".to_string());
-        assert_eq!(tier.code, "SV".to_string());
+        match tier {
+            Tier::SilverII(pt) => {
+                assert_eq!(pt, 7000);
+                assert_eq!(tier.to_string(), "Silver II".to_string());
+            }
+            t => panic!(
+                "It does not converted to right tier (it should be \"Silver II\"): {}",
+                t.to_string()
+            ),
+        }
     }
 
     #[test]
     fn tier_info_load() {
         // Loading tier info; as 4 buttons tier on "DEV"
         let example_username = "DEV";
-        let load_user_tier = VArchiveUserTierInfo::load_user_tier(&example_username, 4);
+        let load_user_tier = load_user_tier(&example_username, 4);
 
         match load_user_tier {
-            Ok(info) => {
-                assert_eq!(info.success, true);
-            }
-            Err(_) => {
-                panic!("not successed to load user tier info")
+            Ok(_) => {}
+            Err(e) => {
+                panic!("not successed to load user tier info: {}", e.to_string())
             }
         };
     }
@@ -1216,22 +1327,25 @@ mod tests {
                 assert_eq!(r.dlc_code, "VE4".to_string());
                 assert_eq!(r.patterns.four_buttons.normal.level, 5);
             }
-            Err(e) => {
-                panic!("it has error: {}", e.to_string())
-            }
+            Err(e) => panic!("it has error: {}", e.to_string()),
         };
     }
 
     #[test]
     fn get_user_board() {
         let example_username = "내꺼";
-        let user_board_resp = VArciveUserBoard::load_user_board(example_username, &6, "MX");
+        let user_board_resp = load_user_floor_board(example_username, 6, "MX");
 
         match user_board_resp {
             Ok(board) => {
-                assert_eq!(board.success, true);
-                assert_eq!(board.board_type, "MX".to_string());
-                assert_eq!(board.button, 6);
+                assert_eq!(board.board_type.to_string(), "MX".to_string());
+                match board.button {
+                    ButtonMode::Six => {}
+                    b => panic!(
+                        "It should be 6 button but it's not: {} buttons",
+                        b.to_string()
+                    ),
+                }
             }
             Err(e) => {
                 panic!("it has error: {}", e)
