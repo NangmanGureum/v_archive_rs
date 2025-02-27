@@ -1,3 +1,5 @@
+* 0.10.1
+  * Fix some error at *Guidelines on the Derivative Works of DJMAX IP*
 * 0.10.0
   * Support for collab DLCs and PLI (e. g. `SongCatagory::Pli(1)`)
   * Add some examples.
