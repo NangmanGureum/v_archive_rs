@@ -1,9 +1,9 @@
 [package]
 name = "v_archive_rs"
-version = "0.9.0"
+version = "0.10.0"
 edition = "2021"
 description = "A Rust library for V-Archive"
-license = "MIT"
+license = "MIT AND SEE LICENSE IN DJMAX-Derivative-Works-Guidelines.md"
 documentation = "https://docs.rs/v_archive_rs"
 repository = "https://github.com/NangmanGureum/v_archive_rs"
 

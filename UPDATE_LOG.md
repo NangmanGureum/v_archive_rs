@@ -1,3 +1,10 @@
+* 0.10.0
+  * Support for collab DLCs and PLI (e. g. `SongCatagory::Pli(1)`)
+  * Add some examples.
+  * Add a file: `DJMAX-Derivative-Works-Guidelines.md`
+  * Fix Licenses: `MIT` ->  `MIT AND SEE LICENSE IN DJMAX-Derivative-Works-Guidelines.md`
+  * Support `to_string()` for `ButtonMode`
+  * Update for Docs
 * 0.9.0
   * Add new `struct`s
     * `Tier`

@@ -17,5 +17,10 @@ fn main() {
 }
 ```
 
+See more examples to [`examples`](./examples)
+
 ## Update log
 See [UPDATE_LOG.md](./UPDATE_LOG.md)
+
+## License
+Most of codes follow [MIT License](https://opensource.org/license/mit). But, some parts related *DJMAX RESPECT V* (such as `SongCatagory` enum) follow [Guidelines on the Derivative Works of DJMAX IP](./DJMAX-Derivative-Works-Guidelines.md).

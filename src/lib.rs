@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use serde_this_or_that::{as_bool, as_f64, as_u64};
+use serde_this_or_that::{as_bool, as_f64};
 use std::convert::From;
 use std::fmt;
 use std::num::ParseIntError;
@@ -94,18 +94,21 @@ fn catch_server_err(code: u16, resp: Response) -> APIError {
     };
 }
 
+/// Cartegories for new initial contents of DJMAX RESPECT or DMRV
 #[derive(Debug)]
 pub enum RespectCat {
     Respect,
     RespectV,
 }
 
+/// Cartegories for legacy initial contents of DJMAX RESPECT or DMRV
 #[derive(Debug)]
 pub enum LegacyCat {
     PortableOne,
     PortableTwo,
 }
 
+/// Cartegories for DLCs of legacy DJMAX series
 #[derive(Debug)]
 pub enum LegacyExtCat {
     Trilogy,
@@ -119,6 +122,7 @@ pub enum LegacyExtCat {
     TechnikaTuneQ,
 }
 
+/// Cartegories for DLCs of new contents of DJMAX RESPECT V
 #[derive(Debug)]
 pub enum NewExtCat {
     VExtentionOne,
@@ -130,12 +134,14 @@ pub enum NewExtCat {
     VLivertyTwo,
 }
 
+/// Cartegories for a song
 #[derive(Debug)]
 pub enum SongCatagory {
     Respect(RespectCat),
     Legacy(LegacyCat),
     LegacyExtention(LegacyExtCat),
     NewExtention(NewExtCat),
+    Pli(u8),
     Collab(String),
     Others(String),
 }
@@ -143,9 +149,11 @@ pub enum SongCatagory {
 impl From<&str> for SongCatagory {
     fn from(idfinder: &str) -> Self {
         match idfinder {
+            // RESPECT V default songs
             "R" => Self::Respect(RespectCat::Respect),
             "P1" => Self::Legacy(LegacyCat::PortableOne),
             "P2" => Self::Legacy(LegacyCat::PortableTwo),
+            // Legacy DLC series
             "ES" => Self::LegacyExtention(LegacyExtCat::EmotionalSense),
             "TR" => Self::LegacyExtention(LegacyExtCat::Trilogy),
             "BS" => Self::LegacyExtention(LegacyExtCat::BlackSquare),
@@ -155,6 +163,7 @@ impl From<&str> for SongCatagory {
             "T1" => Self::LegacyExtention(LegacyExtCat::TechnikaOne),
             "P3" => Self::LegacyExtention(LegacyExtCat::PortableThree),
             "TQ" => Self::LegacyExtention(LegacyExtCat::TechnikaTuneQ),
+            // New original DLC series
             "VE" => Self::NewExtention(NewExtCat::VExtentionOne),
             "VE2" => Self::NewExtention(NewExtCat::VExtentionTwo),
             "VE3" => Self::NewExtention(NewExtCat::VExtentionThree),
@@ -162,6 +171,12 @@ impl From<&str> for SongCatagory {
             "VE5" => Self::NewExtention(NewExtCat::VExtentionFive),
             "VL" => Self::NewExtention(NewExtCat::VLivertyOne),
             "VL2" => Self::NewExtention(NewExtCat::VLivertyTwo),
+            // PLI extention
+            "PLI1" => Self::Pli(1),
+            // Collab DLC
+            "GG" | "GC" | "CY" | "CHU" | "ESTI" | "NXN" | "MD" | "EZ2" | "MAP" | "FAL" | "TEK" => {
+                Self::Collab(idfinder.to_owned())
+            }
             _ => Self::Others(idfinder.to_owned()),
         }
     }
@@ -227,6 +242,7 @@ impl fmt::Display for ButtonMode {
     }
 }
 
+/// Difficulty types for a chart
 #[derive(Debug)]
 pub enum ChartType {
     Normal,
@@ -244,6 +260,18 @@ impl From<&str> for ChartType {
             "MX" => ChartType::Maximum,
             "SC" => ChartType::Sc,
             other => ChartType::Other(other.to_owned()),
+        }
+    }
+}
+
+impl fmt::Display for ChartType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Normal => write!(f, "NM"),
+            Self::Hard => write!(f, "HD"),
+            Self::Maximum => write!(f, "MX"),
+            Self::Sc => write!(f, "SC"),
+            Self::Other(t) => write!(f, "{}", t),
         }
     }
 }
