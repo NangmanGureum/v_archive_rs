@@ -23,4 +23,6 @@ See more examples to [`examples`](./examples)
 See [UPDATE_LOG.md](./UPDATE_LOG.md)
 
 ## License
-Most of codes follow [MIT License](https://opensource.org/license/mit). But, some parts related *DJMAX RESPECT V* (such as `SongCatagory` enum) follow [Guidelines on the Derivative Works of DJMAX IP](./DJMAX-Derivative-Works-Guidelines.md).
+Most of codes follow [MIT License](https://opensource.org/license/mit). But, some parts related to *DJMAX RESPECT V* (such as `SongCatagory` enum) follow [Guidelines on the Derivative Works of DJMAX IP](./DJMAX-Derivative-Works-Guidelines.md).
+
+`SPDX-License-Identifier: MIT AND SEE LICENSE IN DJMAX-Derivative-Works-Guidelines.md`

@@ -3,7 +3,7 @@ name = "v_archive_rs"
 version = "0.10.0"
 edition = "2021"
 description = "A Rust library for V-Archive"
-license = "MIT AND SEE LICENSE IN DJMAX-Derivative-Works-Guidelines.md"
+license-file = "README.md"
 documentation = "https://docs.rs/v_archive_rs"
 repository = "https://github.com/NangmanGureum/v_archive_rs"
 
