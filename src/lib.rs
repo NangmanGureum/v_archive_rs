@@ -182,6 +182,7 @@ impl From<&str> for SongCatagory {
     }
 }
 
+/// Button modes for a chart
 #[repr(u8)]
 #[derive(Debug)]
 pub enum ButtonMode {
@@ -285,7 +286,7 @@ pub struct UserChartRecord {
     pub title: String,
     /// A button type of the chart
     pub button: ButtonMode,
-    /// A difficulty type of the chart
+    /// A difficulty type of the chart (e. g.: Normal, Hard, Maximum, SC)
     pub chart_type: ChartType,
     /// A user's accuracy rate for the chart
     pub acc_rate: Option<f64>,
@@ -324,6 +325,7 @@ impl UserChartRecord {
     }
 }
 
+/// Tier enum for a table
 #[derive(Debug)]
 pub enum Tier {
     Beginner(u16),
@@ -366,6 +368,7 @@ impl Tier {
         Self::Beginner(0)
     }
 
+    /// Points to tier enum
     pub fn from(points: u16) -> Self {
         match points {
             0..=499 => Self::Beginner(0),
