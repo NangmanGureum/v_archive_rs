@@ -1,4 +1,6 @@
-use v_archive_rs::{load_user_floor_board, UserChartRecord, UserFloorRecord, UserFloorRecordBoard};
+use v_archive_rs::{
+    load_user_floor_board, UserChartRecord, UserFloorRecordBoard, UserFloorRecordSet,
+};
 
 fn a_line(line_type: i32) {
     match line_type {
@@ -8,7 +10,7 @@ fn a_line(line_type: i32) {
     }
 }
 
-fn get_records_from_board(floors: Vec<UserFloorRecord>) -> Vec<UserChartRecord> {
+fn get_records_from_board(floors: Vec<UserFloorRecordSet>) -> Vec<UserChartRecord> {
     let mut song_list = Vec::new();
 
     for f in floors {

@@ -174,9 +174,8 @@ impl From<&str> for SongCatagory {
             // PLI extention
             "PLI1" => Self::Pli(1),
             // Collab DLC
-            "GG" | "GC" | "CY" | "CHU" | "ESTI" | "NXN" | "MD" | "EZ2" | "MAP" | "FAL" | "TEK" => {
-                Self::Collab(idfinder.to_owned())
-            }
+            "GG" | "GC" | "CY" | "CHU" | "ESTI" | "NXN" | "MD" | "EZ2" | "MAP" | "FAL" | "TEK"
+            | "BA" => Self::Collab(idfinder.to_owned()),
             _ => Self::Others(idfinder.to_owned()),
         }
     }
@@ -277,28 +276,28 @@ impl fmt::Display for ChartType {
     }
 }
 
-/// A struct for user's record for a chart
+/// A user's record for a chart
 #[derive(Debug)]
 pub struct UserChartRecord {
     /// ID number for a song of the chart
     pub song_id: usize,
-    /// A song title for the chart
+    /// A song title for the chart (not same as on *V-Archive API*; the API's `title` goes `song_id` in this library)
     pub title: String,
-    /// A button type of the chart
+    /// A button type of the chart (e. g.: `ButtonMode::Four`)
     pub button: ButtonMode,
-    /// A difficulty type of the chart (e. g.: Normal, Hard, Maximum, SC)
+    /// A difficulty type of the chart (e. g.: `ChartType::Normal`)
     pub chart_type: ChartType,
-    /// A user's accuracy rate for the chart
+    /// A user's accuracy rate for the chart (If the user doesn't play the chart, it will be `None`)
     pub acc_rate: Option<f64>,
     /// user's max combo or not for the chart
     pub is_max_combo: bool,
-    /// A level for the chart
+    /// A level for the chart (Not available at `load_user_floor_board()`)
     pub chart_level: Option<u8>,
     /// A level on V-Archive's floor
     pub floor_level: f64,
     /// A user's rating on V-Archive for a chart
     pub user_rating: f64,
-    /// A maximum rating on V-Archive for a chart
+    /// A maximum rating on V-Archive for a chart (Not available for `load_user_tier()`)
     pub maximum_rating: Option<f64>,
     /// A DJPOWER point for DJMAX. (This may differ from in-game.)
     pub dj_power: Option<f64>,
@@ -584,15 +583,16 @@ pub fn load_user_tier(username: &str, buttons: u8) -> Result<UserTierRecordTable
     }
 }
 
+/// A set of
 #[derive(Debug)]
-pub struct UserFloorRecord {
+pub struct UserFloorRecordSet {
     /// A number of floor
     pub floor_number: f64,
     /// A bunch of records
     pub records: Vec<UserChartRecord>,
 }
 
-impl UserFloorRecord {
+impl UserFloorRecordSet {
     pub fn new() -> Self {
         Self {
             floor_number: 0.0,
@@ -714,7 +714,7 @@ pub struct UserFloorRecordBoard {
     /// Numbers of records on the board
     pub total_count: usize,
     /// List of floors with records
-    pub floors: Vec<UserFloorRecord>,
+    pub floors: Vec<UserFloorRecordSet>,
 }
 
 impl UserFloorRecordBoard {
@@ -767,7 +767,7 @@ fn user_floor_board_parse(parse_text: String) -> UserFloorRecordBoard {
     let mut floors = Vec::new();
 
     for api_floor in api_body.floors {
-        let mut floor = UserFloorRecord::new();
+        let mut floor = UserFloorRecordSet::new();
         floor.floor_number = api_floor.floor_number;
 
         let mut user_records = Vec::new();
@@ -973,104 +973,6 @@ impl VArchiveSongUserResult {
         }
     }
 }
-
-// /// Legacy struct (which will be removed.)
-// #[derive(Serialize, Deserialize, Debug)]
-// #[serde(rename_all = "camelCase")]
-// pub struct VArchiveFloorSongResult {
-//     pub title: usize,
-//     pub name: String,
-//     pub composer: String,
-//     pub pattern: String,
-//     #[serde(deserialize_with = "as_f64")]
-//     pub score: f64,
-//     #[serde(deserialize_with = "as_bool")]
-//     pub max_combo: bool,
-//     pub djpower: f64,
-//     pub rating: f64,
-//     pub dlc: String,
-//     pub dlc_code: String,
-// }
-
-// impl VArchiveFloorSongResult {
-//     pub fn new() -> Self {
-//         Self {
-//             title: 0,
-//             name: String::new(),
-//             composer: String::new(),
-//             pattern: String::new(),
-//             score: 0.0,
-//             max_combo: false,
-//             djpower: 0.0,
-//             rating: 0.0,
-//             dlc: String::new(),
-//             dlc_code: String::new(),
-//         }
-//     }
-// }
-
-// /// Legacy struct (which will be removed.)
-// #[derive(Serialize, Deserialize, Debug)]
-// #[serde(rename_all = "camelCase")]
-// pub struct VArchiveUserFloor {
-//     pub floor_number: f64,
-//     pub patterns: Vec<VArchiveFloorSongResult>,
-// }
-
-// impl VArchiveUserFloor {
-//     pub fn new() -> Self {
-//         Self {
-//             floor_number: 0.0,
-//             patterns: Vec::new(),
-//         }
-//     }
-// }
-
-// /// Legacy struct (which will be removed.)
-// #[derive(Serialize, Deserialize, Debug)]
-// #[serde(rename_all = "camelCase")]
-// pub struct VArciveUserBoard {
-//     success: bool,
-//     #[serde(alias = "board")]
-//     pub board_type: String,
-//     #[serde(deserialize_with = "as_u64")]
-//     pub button: u64,
-//     pub total_count: usize,
-//     pub floors: Vec<VArchiveUserFloor>,
-// }
-
-// impl VArciveUserBoard {
-//     pub fn new() -> Self {
-//         Self {
-//             success: true,
-//             board_type: String::new(),
-//             button: 4,
-//             total_count: 0,
-//             floors: Vec::new(),
-//         }
-//     }
-
-//     pub fn load_user_board(
-//         username: &str,
-//         buttons: &u8,
-//         board_type: &str,
-//     ) -> Result<Self, APIError> {
-//         let get_url =
-//             format!("https://v-archive.net/api/archive/{username}/board/{buttons}/{board_type}");
-//         let resp = ureq::get(&get_url)
-//             .set("Content-Type", "application/json")
-//             .call();
-
-//         match resp {
-//             Ok(resp) => {
-//                 let resp_str = resp.into_string().unwrap();
-//                 Ok(serde_json::from_str(&resp_str).unwrap())
-//             }
-//             Err(Error::Status(code, resp)) => Err(catch_server_err(code, resp)),
-//             Err(_) => Err(APIError::UnknownError),
-//         }
-//     }
-// }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct VArchiveRegisterResult {

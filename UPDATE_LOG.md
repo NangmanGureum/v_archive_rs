@@ -1,3 +1,7 @@
+* 0.11.0
+  * Add to support a collab DLC (`BA`)
+  * Change function name: `UserFloorRecord` -> `UserFloorRecordSet`
+  * Update `README.md` at Todo-list
 * 0.10.2
   * Add more document stuff.
   * Add some examples.
