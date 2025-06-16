@@ -1,3 +1,16 @@
+* 0.12.0
+  * Remove `struct`s
+    * `VArchivePattern` (replaced to `Chart`)
+    * `VArchiveSongPattern` (replaced to `Chart`)
+    * `VArchivePatternList` (replaced to `Vec<Chart>`)
+    * `VArchiveSongPatternList` (replaced to `Vec<Chart>`)
+    * `VArchivePatternTable` (replaced to `Vec<Chart>`)
+    * `VArchiveSongPatternTable` (replaced to `Vec<Chart>`)
+    * `VArchiveSong` (replaced to `SongSet`)
+    * `VArchiveSongUserResult` (replaced to `SongUserRecord`)
+  * Add new function: `load_user_song_result`
+  * Add to support a new extention DLC, V LIVERTY 3 (`VL3`)
+  * Update *Guidelines on the Derivative Works of DJMAX IP*.
 * 0.11.0
   * Add to support a collab DLC (`BA`)
   * Change function name: `UserFloorRecord` -> `UserFloorRecordSet`

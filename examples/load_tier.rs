@@ -23,7 +23,7 @@ fn display_tier(table: UserTierRecordTable, username: &str, buttons: u8) {
     for r in table.top_records {
         print!("{} ", r.title);
         print!("<{}> ", r.chart_type.to_string());
-        print!("- {}({})", r.acc_rate.unwrap(), r.user_rating);
+        print!("- {}({})", r.acc_rate.unwrap(), r.user_rating.unwrap());
         print!("\n");
 
         if count > 10 {

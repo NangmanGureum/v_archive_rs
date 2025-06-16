@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use serde_this_or_that::{as_bool, as_f64};
+use serde_this_or_that::as_bool;
 use std::convert::From;
 use std::fmt;
 use std::num::ParseIntError;
@@ -95,21 +95,21 @@ fn catch_server_err(code: u16, resp: Response) -> APIError {
 }
 
 /// Cartegories for new initial contents of DJMAX RESPECT or DMRV
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum RespectCat {
     Respect,
     RespectV,
 }
 
 /// Cartegories for legacy initial contents of DJMAX RESPECT or DMRV
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum LegacyCat {
     PortableOne,
     PortableTwo,
 }
 
 /// Cartegories for DLCs of legacy DJMAX series
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum LegacyExtCat {
     Trilogy,
     Clazziquai,
@@ -123,7 +123,7 @@ pub enum LegacyExtCat {
 }
 
 /// Cartegories for DLCs of new contents of DJMAX RESPECT V
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum NewExtCat {
     VExtentionOne,
     VExtentionTwo,
@@ -132,10 +132,11 @@ pub enum NewExtCat {
     VExtentionFive,
     VLivertyOne,
     VLivertyTwo,
+    VLivertyThree,
 }
 
 /// Cartegories for a song
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum SongCatagory {
     Respect(RespectCat),
     Legacy(LegacyCat),
@@ -171,6 +172,7 @@ impl From<&str> for SongCatagory {
             "VE5" => Self::NewExtention(NewExtCat::VExtentionFive),
             "VL" => Self::NewExtention(NewExtCat::VLivertyOne),
             "VL2" => Self::NewExtention(NewExtCat::VLivertyTwo),
+            "VL3" => Self::NewExtention(NewExtCat::VLivertyThree),
             // PLI extention
             "PLI1" => Self::Pli(1),
             // Collab DLC
@@ -276,6 +278,40 @@ impl fmt::Display for ChartType {
     }
 }
 
+/// A song's content
+#[derive(Debug)]
+pub struct Song {
+    /// ID number for a song
+    pub song_id: usize,
+    /// A song title (not same as on *V-Archive API*; the API's `title` goes `song_id` in this library)
+    pub title: String,
+    /// A song's artist
+    pub artist: String,
+    /// A category for a song
+    pub song_cat: SongCatagory,
+}
+
+impl Song {
+    fn new() -> Self {
+        Self {
+            song_id: 0,
+            title: String::new(),
+            artist: String::new(),
+            song_cat: SongCatagory::Others(String::new()),
+        }
+    }
+}
+
+/// A chart for a song
+#[derive(Debug)]
+pub struct Chart {
+    pub level: u8,
+    pub floor: Option<f64>,
+    pub rating: Option<f64>,
+    pub button: ButtonMode,
+    pub chart_type: ChartType,
+}
+
 /// A user's record for a chart
 #[derive(Debug)]
 pub struct UserChartRecord {
@@ -294,9 +330,9 @@ pub struct UserChartRecord {
     /// A level for the chart (Not available at `load_user_floor_board()`)
     pub chart_level: Option<u8>,
     /// A level on V-Archive's floor
-    pub floor_level: f64,
+    pub floor_level: Option<f64>,
     /// A user's rating on V-Archive for a chart
-    pub user_rating: f64,
+    pub user_rating: Option<f64>,
     /// A maximum rating on V-Archive for a chart (Not available for `load_user_tier()`)
     pub maximum_rating: Option<f64>,
     /// A DJPOWER point for DJMAX. (This may differ from in-game.)
@@ -306,7 +342,7 @@ pub struct UserChartRecord {
 }
 
 impl UserChartRecord {
-    pub fn new() -> Self {
+    fn new() -> Self {
         Self {
             song_id: 0,
             title: String::new(),
@@ -315,8 +351,8 @@ impl UserChartRecord {
             acc_rate: None,
             is_max_combo: false,
             chart_level: None,
-            floor_level: 0.0,
-            user_rating: 0.0,
+            floor_level: None,
+            user_rating: None,
             maximum_rating: None,
             dj_power: None,
             song_cat: None,
@@ -519,8 +555,8 @@ fn load_user_tier_parse(parse_text: String) -> UserTierRecordTable {
         user_record.chart_type = ChartType::from(record.pattern.as_str());
         user_record.is_max_combo = record.max_combo;
         user_record.chart_level = Some(record.level);
-        user_record.floor_level = record.floor.parse().unwrap();
-        user_record.user_rating = record.rating.parse().unwrap();
+        user_record.floor_level = Some(record.floor.parse().unwrap());
+        user_record.user_rating = Some(record.rating.parse().unwrap());
         user_record.maximum_rating = Some(record.max_rating.parse().unwrap());
 
         user_record.acc_rate = match record.score {
@@ -780,8 +816,8 @@ fn user_floor_board_parse(parse_text: String) -> UserFloorRecordBoard {
             user_record.button = ButtonMode::from_str(&api_body.button).unwrap();
             user_record.chart_type = ChartType::from(record.pattern.as_str());
             user_record.is_max_combo = record.max_combo;
-            user_record.floor_level = api_floor.floor_number;
-            user_record.user_rating = record.rating;
+            user_record.floor_level = Some(api_floor.floor_number);
+            user_record.user_rating = Some(record.rating);
             user_record.dj_power = Some(record.djpower);
             user_record.song_cat = Some(SongCatagory::from(record.dlc_code.as_str()));
 
@@ -850,129 +886,536 @@ pub fn load_user_floor_board(
     }
 }
 
-/// This is a pattern for a song. Legacy struct (which will be removed.)
-#[derive(Serialize, Deserialize, Debug, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct VArchivePattern {
-    pub level: u8,
-    #[serde(default)]
-    pub floor: f64,
-    #[serde(default)]
-    #[serde(deserialize_with = "as_f64")]
-    pub score: f64,
-    #[serde(default)]
-    #[serde(deserialize_with = "as_bool")]
-    pub max_combo: bool,
-    #[serde(default)]
-    pub rating: f64,
+pub struct SongUserRecord {
+    pub song_content: Song,
+    pub records: Vec<UserChartRecord>,
 }
 
-impl VArchivePattern {
-    pub fn new() -> Self {
-        Self {
-            level: 0,
-            floor: 0.0,
-            score: 0.0,
-            max_combo: false,
-            rating: 0.0,
+fn user_song_result_parse(parse_text: String) -> SongUserRecord {
+    #[derive(Deserialize, Default)]
+    #[serde(rename_all = "camelCase")]
+    struct APIRecord {
+        level: u8,
+        #[serde(default)]
+        floor: Option<f64>,
+        #[serde(default)]
+        rating: Option<f64>,
+        #[serde(default)]
+        score: Option<String>,
+        #[serde(default)]
+        djpower: Option<f64>,
+        #[serde(default)]
+        #[serde(deserialize_with = "as_bool")]
+        max_combo: bool,
+    }
+
+    #[derive(Deserialize, Default)]
+    struct APIChartList {
+        #[serde(default)]
+        NM: Option<APIRecord>,
+        #[serde(default)]
+        HD: Option<APIRecord>,
+        #[serde(default)]
+        MX: Option<APIRecord>,
+        #[serde(default)]
+        SC: Option<APIRecord>,
+    }
+
+    #[derive(Deserialize)]
+    struct APIChartTable {
+        #[serde(alias = "4B")]
+        four_buttons: APIChartList,
+        #[serde(alias = "5B")]
+        five_buttons: APIChartList,
+        #[serde(alias = "6B")]
+        six_buttons: APIChartList,
+        #[serde(alias = "8B")]
+        eight_buttons: APIChartList,
+    }
+
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct APIBody {
+        success: bool,
+        title: usize,
+        name: String,
+        composer: String,
+        dlc_code: String,
+        dlc: String,
+        patterns: APIChartTable,
+    }
+
+    let api_body: APIBody = serde_json::from_str(&parse_text).unwrap();
+
+    let song_id = api_body.title;
+    let song_title = api_body.name;
+    let song_artist = api_body.composer;
+    let song_cat = SongCatagory::from(api_body.dlc_code.as_str());
+
+    let song_meta = Song {
+        song_id,
+        title: song_title.clone(),
+        artist: song_artist,
+        song_cat: song_cat.clone(),
+    };
+
+    // Convert record format
+    let mut records: Vec<UserChartRecord> = Vec::new();
+
+    let records_list = api_body.patterns;
+
+    // 4B NM
+    match records_list.four_buttons.NM {
+        Some(r) => {
+            let acc_rate = match r.score {
+                Some(s) => Some(s.parse::<f64>().unwrap()),
+                None => None,
+            };
+            records.push(UserChartRecord {
+                song_id,
+                title: song_title.clone(),
+                button: ButtonMode::Four,
+                chart_type: ChartType::Normal,
+                acc_rate,
+                is_max_combo: r.max_combo,
+                chart_level: Some(r.level),
+                floor_level: r.floor,
+                user_rating: r.rating,
+                maximum_rating: None,
+                dj_power: r.djpower,
+                song_cat: Some(song_cat.clone()),
+            });
         }
+        None => {}
+    };
+    // 4B HD
+    match records_list.four_buttons.HD {
+        Some(r) => {
+            let acc_rate = match r.score {
+                Some(s) => Some(s.parse::<f64>().unwrap()),
+                None => None,
+            };
+            records.push(UserChartRecord {
+                song_id,
+                title: song_title.clone(),
+                button: ButtonMode::Four,
+                chart_type: ChartType::Hard,
+                acc_rate,
+                is_max_combo: r.max_combo,
+                chart_level: Some(r.level),
+                floor_level: r.floor,
+                user_rating: r.rating,
+                maximum_rating: None,
+                dj_power: r.djpower,
+                song_cat: Some(song_cat.clone()),
+            });
+        }
+        None => {}
+    };
+    // 4B MX
+    match records_list.four_buttons.MX {
+        Some(r) => {
+            let acc_rate = match r.score {
+                Some(s) => Some(s.parse::<f64>().unwrap()),
+                None => None,
+            };
+            records.push(UserChartRecord {
+                song_id,
+                title: song_title.clone(),
+                button: ButtonMode::Four,
+                chart_type: ChartType::Maximum,
+                acc_rate,
+                is_max_combo: r.max_combo,
+                chart_level: Some(r.level),
+                floor_level: r.floor,
+                user_rating: r.rating,
+                maximum_rating: None,
+                dj_power: r.djpower,
+                song_cat: Some(song_cat.clone()),
+            });
+        }
+        None => {}
+    };
+    // 4B SC
+    match records_list.four_buttons.SC {
+        Some(r) => {
+            let acc_rate = match r.score {
+                Some(s) => Some(s.parse::<f64>().unwrap()),
+                None => None,
+            };
+            records.push(UserChartRecord {
+                song_id,
+                title: song_title.clone(),
+                button: ButtonMode::Four,
+                chart_type: ChartType::Sc,
+                acc_rate,
+                is_max_combo: r.max_combo,
+                chart_level: Some(r.level),
+                floor_level: r.floor,
+                user_rating: r.rating,
+                maximum_rating: None,
+                dj_power: r.djpower,
+                song_cat: Some(song_cat.clone()),
+            });
+        }
+        None => {}
+    };
+
+    // 5B NM
+    match records_list.five_buttons.NM {
+        Some(r) => {
+            let acc_rate = match r.score {
+                Some(s) => Some(s.parse::<f64>().unwrap()),
+                None => None,
+            };
+            records.push(UserChartRecord {
+                song_id,
+                title: song_title.clone(),
+                button: ButtonMode::Five,
+                chart_type: ChartType::Normal,
+                acc_rate,
+                is_max_combo: r.max_combo,
+                chart_level: Some(r.level),
+                floor_level: r.floor,
+                user_rating: r.rating,
+                maximum_rating: None,
+                dj_power: r.djpower,
+                song_cat: Some(song_cat.clone()),
+            });
+        }
+        None => {}
+    };
+    // 5B HD
+    match records_list.five_buttons.HD {
+        Some(r) => {
+            let acc_rate = match r.score {
+                Some(s) => Some(s.parse::<f64>().unwrap()),
+                None => None,
+            };
+            records.push(UserChartRecord {
+                song_id,
+                title: song_title.clone(),
+                button: ButtonMode::Five,
+                chart_type: ChartType::Hard,
+                acc_rate,
+                is_max_combo: r.max_combo,
+                chart_level: Some(r.level),
+                floor_level: r.floor,
+                user_rating: r.rating,
+                maximum_rating: None,
+                dj_power: r.djpower,
+                song_cat: Some(song_cat.clone()),
+            });
+        }
+        None => {}
+    };
+    // 5B MX
+    match records_list.five_buttons.MX {
+        Some(r) => {
+            let acc_rate = match r.score {
+                Some(s) => Some(s.parse::<f64>().unwrap()),
+                None => None,
+            };
+            records.push(UserChartRecord {
+                song_id,
+                title: song_title.clone(),
+                button: ButtonMode::Five,
+                chart_type: ChartType::Maximum,
+                acc_rate,
+                is_max_combo: r.max_combo,
+                chart_level: Some(r.level),
+                floor_level: r.floor,
+                user_rating: r.rating,
+                maximum_rating: None,
+                dj_power: r.djpower,
+                song_cat: Some(song_cat.clone()),
+            });
+        }
+        None => {}
+    };
+    // 5B SC
+    match records_list.five_buttons.SC {
+        Some(r) => {
+            let acc_rate = match r.score {
+                Some(s) => Some(s.parse::<f64>().unwrap()),
+                None => None,
+            };
+            records.push(UserChartRecord {
+                song_id,
+                title: song_title.clone(),
+                button: ButtonMode::Five,
+                chart_type: ChartType::Sc,
+                acc_rate,
+                is_max_combo: r.max_combo,
+                chart_level: Some(r.level),
+                floor_level: r.floor,
+                user_rating: r.rating,
+                maximum_rating: None,
+                dj_power: r.djpower,
+                song_cat: Some(song_cat.clone()),
+            });
+        }
+        None => {}
+    };
+
+    // 6B NM
+    match records_list.six_buttons.NM {
+        Some(r) => {
+            let acc_rate = match r.score {
+                Some(s) => Some(s.parse::<f64>().unwrap()),
+                None => None,
+            };
+            records.push(UserChartRecord {
+                song_id,
+                title: song_title.clone(),
+                button: ButtonMode::Six,
+                chart_type: ChartType::Normal,
+                acc_rate,
+                is_max_combo: r.max_combo,
+                chart_level: Some(r.level),
+                floor_level: r.floor,
+                user_rating: r.rating,
+                maximum_rating: None,
+                dj_power: r.djpower,
+                song_cat: Some(song_cat.clone()),
+            });
+        }
+        None => {}
+    };
+    // 6B HD
+    match records_list.six_buttons.HD {
+        Some(r) => {
+            let acc_rate = match r.score {
+                Some(s) => Some(s.parse::<f64>().unwrap()),
+                None => None,
+            };
+            records.push(UserChartRecord {
+                song_id,
+                title: song_title.clone(),
+                button: ButtonMode::Six,
+                chart_type: ChartType::Hard,
+                acc_rate,
+                is_max_combo: r.max_combo,
+                chart_level: Some(r.level),
+                floor_level: r.floor,
+                user_rating: r.rating,
+                maximum_rating: None,
+                dj_power: r.djpower,
+                song_cat: Some(song_cat.clone()),
+            });
+        }
+        None => {}
+    };
+    // 6B MX
+    match records_list.six_buttons.MX {
+        Some(r) => {
+            let acc_rate = match r.score {
+                Some(s) => Some(s.parse::<f64>().unwrap()),
+                None => None,
+            };
+            records.push(UserChartRecord {
+                song_id,
+                title: song_title.clone(),
+                button: ButtonMode::Six,
+                chart_type: ChartType::Maximum,
+                acc_rate,
+                is_max_combo: r.max_combo,
+                chart_level: Some(r.level),
+                floor_level: r.floor,
+                user_rating: r.rating,
+                maximum_rating: None,
+                dj_power: r.djpower,
+                song_cat: Some(song_cat.clone()),
+            });
+        }
+        None => {}
+    };
+    // 6B SC
+    match records_list.six_buttons.SC {
+        Some(r) => {
+            let acc_rate = match r.score {
+                Some(s) => Some(s.parse::<f64>().unwrap()),
+                None => None,
+            };
+            records.push(UserChartRecord {
+                song_id,
+                title: song_title.clone(),
+                button: ButtonMode::Six,
+                chart_type: ChartType::Sc,
+                acc_rate,
+                is_max_combo: r.max_combo,
+                chart_level: Some(r.level),
+                floor_level: r.floor,
+                user_rating: r.rating,
+                maximum_rating: None,
+                dj_power: r.djpower,
+                song_cat: Some(song_cat.clone()),
+            });
+        }
+        None => {}
+    };
+
+    // 8B NM
+    match records_list.eight_buttons.NM {
+        Some(r) => {
+            let acc_rate = match r.score {
+                Some(s) => Some(s.parse::<f64>().unwrap()),
+                None => None,
+            };
+            records.push(UserChartRecord {
+                song_id,
+                title: song_title.clone(),
+                button: ButtonMode::Eight,
+                chart_type: ChartType::Normal,
+                acc_rate,
+                is_max_combo: r.max_combo,
+                chart_level: Some(r.level),
+                floor_level: r.floor,
+                user_rating: r.rating,
+                maximum_rating: None,
+                dj_power: r.djpower,
+                song_cat: Some(song_cat.clone()),
+            });
+        }
+        None => {}
+    };
+    // 8B HD
+    match records_list.eight_buttons.HD {
+        Some(r) => {
+            let acc_rate = match r.score {
+                Some(s) => Some(s.parse::<f64>().unwrap()),
+                None => None,
+            };
+            records.push(UserChartRecord {
+                song_id,
+                title: song_title.clone(),
+                button: ButtonMode::Eight,
+                chart_type: ChartType::Hard,
+                acc_rate,
+                is_max_combo: r.max_combo,
+                chart_level: Some(r.level),
+                floor_level: r.floor,
+                user_rating: r.rating,
+                maximum_rating: None,
+                dj_power: r.djpower,
+                song_cat: Some(song_cat.clone()),
+            });
+        }
+        None => {}
+    };
+    // 8B MX
+    match records_list.eight_buttons.MX {
+        Some(r) => {
+            let acc_rate = match r.score {
+                Some(s) => Some(s.parse::<f64>().unwrap()),
+                None => None,
+            };
+            records.push(UserChartRecord {
+                song_id,
+                title: song_title.clone(),
+                button: ButtonMode::Eight,
+                chart_type: ChartType::Maximum,
+                acc_rate,
+                is_max_combo: r.max_combo,
+                chart_level: Some(r.level),
+                floor_level: r.floor,
+                user_rating: r.rating,
+                maximum_rating: None,
+                dj_power: r.djpower,
+                song_cat: Some(song_cat.clone()),
+            });
+        }
+        None => {}
+    };
+    // 8B SC
+    match records_list.eight_buttons.SC {
+        Some(r) => {
+            let acc_rate = match r.score {
+                Some(s) => Some(s.parse::<f64>().unwrap()),
+                None => None,
+            };
+            records.push(UserChartRecord {
+                song_id,
+                title: song_title.clone(),
+                button: ButtonMode::Eight,
+                chart_type: ChartType::Sc,
+                acc_rate,
+                is_max_combo: r.max_combo,
+                chart_level: Some(r.level),
+                floor_level: r.floor,
+                user_rating: r.rating,
+                maximum_rating: None,
+                dj_power: r.djpower,
+                song_cat: Some(song_cat.clone()),
+            });
+        }
+        None => {}
+    };
+
+    SongUserRecord {
+        song_content: song_meta,
+        records,
     }
 }
 
-/// This is pattern list for a kind of buttons for a song. Legacy struct (which will be removed.)
-#[derive(Serialize, Deserialize, Debug)]
-pub struct VArchivePatternList {
-    #[serde(default)]
-    #[serde(alias = "NM")]
-    pub normal: VArchivePattern,
-    #[serde(default)]
-    #[serde(alias = "HD")]
-    pub hard: VArchivePattern,
-    #[serde(default)]
-    #[serde(alias = "MX")]
-    pub maximum: VArchivePattern,
-    #[serde(default)]
-    #[serde(alias = "SC")]
-    pub sc: VArchivePattern,
-}
+pub fn load_user_song_result(username: &str, song_id: usize) -> Result<SongUserRecord, APIError> {
+    let get_url = format!("https://v-archive.net/api/archive/{username}/title/{song_id}");
+    let resp = ureq::get(&get_url)
+        .set("Content-Type", "application/json")
+        .call();
 
-impl VArchivePatternList {
-    pub fn new() -> Self {
-        Self {
-            normal: VArchivePattern::new(),
-            hard: VArchivePattern::new(),
-            maximum: VArchivePattern::new(),
-            sc: VArchivePattern::new(),
+    match resp {
+        Ok(resp) => {
+            let resp_str = resp.into_string().unwrap();
+            Ok(user_song_result_parse(resp_str))
         }
+        Err(Error::Status(code, resp)) => Err(catch_server_err(code, resp)),
+        Err(_) => Err(APIError::UnknownError),
     }
 }
 
-/// This is a pattern table for a song.
-#[derive(Serialize, Deserialize, Debug)]
-pub struct VArchivePatternTable {
-    #[serde(alias = "4B")]
-    pub four_buttons: VArchivePatternList,
-    #[serde(alias = "5B")]
-    pub five_buttons: VArchivePatternList,
-    #[serde(alias = "6B")]
-    pub six_buttons: VArchivePatternList,
-    #[serde(alias = "8B")]
-    pub eight_buttons: VArchivePatternList,
-}
+// /// This is a user's song result. Legacy struct (which will be removed.)
+// #[derive(Serialize, Deserialize, Debug)]
+// #[serde(rename_all = "camelCase")]
+// pub struct VArchiveSongUserResult {
+//     success: bool,
+//     pub title: usize,
+//     pub name: String,
+//     pub composer: String,
+//     pub dlc_code: String,
+//     pub dlc: String,
+//     pub patterns: VArchivePatternTable,
+// }
 
-impl VArchivePatternTable {
-    pub fn new() -> Self {
-        Self {
-            four_buttons: VArchivePatternList::new(),
-            five_buttons: VArchivePatternList::new(),
-            six_buttons: VArchivePatternList::new(),
-            eight_buttons: VArchivePatternList::new(),
-        }
-    }
-}
+// impl VArchiveSongUserResult {
+//     pub fn new() -> Self {
+//         Self {
+//             success: true,
+//             title: 0,
+//             name: String::new(),
+//             composer: String::new(),
+//             dlc_code: String::new(),
+//             dlc: String::new(),
+//             patterns: VArchivePatternTable::new(),
+//         }
+//     }
 
-/// This is a user's song result. Legacy struct (which will be removed.)
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct VArchiveSongUserResult {
-    success: bool,
-    pub title: usize,
-    pub name: String,
-    pub composer: String,
-    pub dlc_code: String,
-    pub dlc: String,
-    pub patterns: VArchivePatternTable,
-}
+//     pub fn load_song_result(username: &str, song_id: &usize) -> Result<Self, APIError> {
+//         let get_url = format!("https://v-archive.net/api/archive/{username}/title/{song_id}");
+//         let resp = ureq::get(&get_url)
+//             .set("Content-Type", "application/json")
+//             .call();
 
-impl VArchiveSongUserResult {
-    pub fn new() -> Self {
-        Self {
-            success: true,
-            title: 0,
-            name: String::new(),
-            composer: String::new(),
-            dlc_code: String::new(),
-            dlc: String::new(),
-            patterns: VArchivePatternTable::new(),
-        }
-    }
-
-    pub fn load_song_result(username: &str, song_id: &usize) -> Result<Self, APIError> {
-        let get_url = format!("https://v-archive.net/api/archive/{username}/title/{song_id}");
-        let resp = ureq::get(&get_url)
-            .set("Content-Type", "application/json")
-            .call();
-
-        match resp {
-            Ok(resp) => {
-                let resp_str = resp.into_string().unwrap();
-                Ok(serde_json::from_str(&resp_str).unwrap())
-            }
-            Err(Error::Status(code, resp)) => Err(catch_server_err(code, resp)),
-            Err(_) => Err(APIError::UnknownError),
-        }
-    }
-}
+//         match resp {
+//             Ok(resp) => {
+//                 let resp_str = resp.into_string().unwrap();
+//                 Ok(serde_json::from_str(&resp_str).unwrap())
+//             }
+//             Err(Error::Status(code, resp)) => Err(catch_server_err(code, resp)),
+//             Err(_) => Err(APIError::UnknownError),
+//         }
+//     }
+// }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct VArchiveRegisterResult {
@@ -1043,66 +1486,314 @@ impl VArchiveUserToken {
     }
 }
 
-/// Legacy struct (which will be removed.)
-#[derive(Serialize, Deserialize, Debug, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct VArchiveSongPattern {
-    pub level: u8,
-    #[serde(default)]
-    pub floor: f64,
-    #[serde(default)]
-    pub rating: f64,
+pub struct SongSet {
+    pub content: Song,
+    pub charts: Vec<Chart>,
 }
 
-/// Legacy struct (which will be removed.)
-#[derive(Serialize, Deserialize, Debug)]
-pub struct VArchiveSongPatternList {
-    #[serde(default)]
-    #[serde(alias = "NM")]
-    pub normal: VArchiveSongPattern,
-    #[serde(default)]
-    #[serde(alias = "HD")]
-    pub hard: VArchiveSongPattern,
-    #[serde(default)]
-    #[serde(alias = "MX")]
-    pub maximum: VArchiveSongPattern,
-    #[serde(default)]
-    #[serde(alias = "SC")]
-    pub sc: VArchiveSongPattern,
+impl SongSet {
+    fn new() -> Self {
+        Self {
+            content: Song::new(),
+            charts: Vec::new(),
+        }
+    }
 }
 
-/// Legacy struct (which will be removed.)
-#[derive(Serialize, Deserialize, Debug)]
-pub struct VArchiveSongPatternTable {
-    #[serde(alias = "4B")]
-    pub four_buttons: VArchiveSongPatternList,
-    #[serde(alias = "5B")]
-    pub five_buttons: VArchiveSongPatternList,
-    #[serde(alias = "6B")]
-    pub six_buttons: VArchiveSongPatternList,
-    #[serde(alias = "8B")]
-    pub eight_buttons: VArchiveSongPatternList,
+fn all_songs_parse(parse_text: String) -> Vec<SongSet> {
+    #[derive(Deserialize, Default)]
+    #[serde(rename_all = "camelCase")]
+    struct APIChart {
+        level: u8,
+        #[serde(default)]
+        floor: Option<f64>,
+        #[serde(default)]
+        rating: Option<f64>,
+    }
+
+    #[derive(Deserialize, Default)]
+    struct APIChartList {
+        #[serde(default)]
+        NM: Option<APIChart>,
+        #[serde(default)]
+        HD: Option<APIChart>,
+        #[serde(default)]
+        MX: Option<APIChart>,
+        #[serde(default)]
+        SC: Option<APIChart>,
+    }
+
+    #[derive(Deserialize)]
+    struct APIChartTable {
+        #[serde(alias = "4B")]
+        four_buttons: APIChartList,
+        #[serde(alias = "5B")]
+        five_buttons: APIChartList,
+        #[serde(alias = "6B")]
+        six_buttons: APIChartList,
+        #[serde(alias = "8B")]
+        eight_buttons: APIChartList,
+    }
+
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct APISongSet {
+        title: usize,
+        name: String,
+        composer: String,
+        dlc_code: String,
+        dlc: String,
+        patterns: APIChartTable,
+    }
+
+    let api_body: Vec<APISongSet> = serde_json::from_str(&parse_text).unwrap();
+
+    let mut song_set_list: Vec<SongSet> = Vec::new();
+
+    for song in api_body {
+        let mut song_set = SongSet::new();
+
+        let mut song_metadata = Song::new();
+
+        song_metadata.song_id = song.title;
+        song_metadata.title = song.name;
+        song_metadata.artist = song.composer;
+        song_metadata.song_cat = SongCatagory::from(song.dlc_code.as_str());
+
+        song_set.content = song_metadata;
+
+        // Convert chart format
+        let mut charts: Vec<Chart> = Vec::new();
+
+        let chart_list = song.patterns;
+
+        // 4B NM
+        match chart_list.four_buttons.NM {
+            Some(c) => {
+                charts.push(Chart {
+                    level: c.level,
+                    floor: c.floor,
+                    rating: c.rating,
+                    button: ButtonMode::Four,
+                    chart_type: ChartType::Normal,
+                });
+            }
+            None => {}
+        }
+        // 4B HD
+        match chart_list.four_buttons.HD {
+            Some(c) => {
+                charts.push(Chart {
+                    level: c.level,
+                    floor: c.floor,
+                    rating: c.rating,
+                    button: ButtonMode::Four,
+                    chart_type: ChartType::Hard,
+                });
+            }
+            None => {}
+        }
+        // 4B MX
+        match chart_list.four_buttons.MX {
+            Some(c) => {
+                charts.push(Chart {
+                    level: c.level,
+                    floor: c.floor,
+                    rating: c.rating,
+                    button: ButtonMode::Four,
+                    chart_type: ChartType::Maximum,
+                });
+            }
+            None => {}
+        }
+        // 4B SC
+        match chart_list.four_buttons.SC {
+            Some(c) => {
+                charts.push(Chart {
+                    level: c.level,
+                    floor: c.floor,
+                    rating: c.rating,
+                    button: ButtonMode::Four,
+                    chart_type: ChartType::Sc,
+                });
+            }
+            None => {}
+        }
+
+        // 5B NM
+        match chart_list.five_buttons.NM {
+            Some(c) => {
+                charts.push(Chart {
+                    level: c.level,
+                    floor: c.floor,
+                    rating: c.rating,
+                    button: ButtonMode::Five,
+                    chart_type: ChartType::Normal,
+                });
+            }
+            None => {}
+        }
+        // 5B HD
+        match chart_list.five_buttons.HD {
+            Some(c) => {
+                charts.push(Chart {
+                    level: c.level,
+                    floor: c.floor,
+                    rating: c.rating,
+                    button: ButtonMode::Five,
+                    chart_type: ChartType::Hard,
+                });
+            }
+            None => {}
+        }
+        // 5B MX
+        match chart_list.five_buttons.MX {
+            Some(c) => {
+                charts.push(Chart {
+                    level: c.level,
+                    floor: c.floor,
+                    rating: c.rating,
+                    button: ButtonMode::Five,
+                    chart_type: ChartType::Maximum,
+                });
+            }
+            None => {}
+        }
+        // 5B SC
+        match chart_list.five_buttons.SC {
+            Some(c) => {
+                charts.push(Chart {
+                    level: c.level,
+                    floor: c.floor,
+                    rating: c.rating,
+                    button: ButtonMode::Five,
+                    chart_type: ChartType::Sc,
+                });
+            }
+            None => {}
+        }
+
+        // 6B NM
+        match chart_list.six_buttons.NM {
+            Some(c) => {
+                charts.push(Chart {
+                    level: c.level,
+                    floor: c.floor,
+                    rating: c.rating,
+                    button: ButtonMode::Six,
+                    chart_type: ChartType::Normal,
+                });
+            }
+            None => {}
+        }
+        // 6B HD
+        match chart_list.six_buttons.HD {
+            Some(c) => {
+                charts.push(Chart {
+                    level: c.level,
+                    floor: c.floor,
+                    rating: c.rating,
+                    button: ButtonMode::Six,
+                    chart_type: ChartType::Hard,
+                });
+            }
+            None => {}
+        }
+        // 6B MX
+        match chart_list.six_buttons.MX {
+            Some(c) => {
+                charts.push(Chart {
+                    level: c.level,
+                    floor: c.floor,
+                    rating: c.rating,
+                    button: ButtonMode::Six,
+                    chart_type: ChartType::Maximum,
+                });
+            }
+            None => {}
+        }
+        // 6B SC
+        match chart_list.six_buttons.SC {
+            Some(c) => {
+                charts.push(Chart {
+                    level: c.level,
+                    floor: c.floor,
+                    rating: c.rating,
+                    button: ButtonMode::Six,
+                    chart_type: ChartType::Sc,
+                });
+            }
+            None => {}
+        }
+
+        // 8B NM
+        match chart_list.eight_buttons.NM {
+            Some(c) => {
+                charts.push(Chart {
+                    level: c.level,
+                    floor: c.floor,
+                    rating: c.rating,
+                    button: ButtonMode::Eight,
+                    chart_type: ChartType::Normal,
+                });
+            }
+            None => {}
+        }
+        // 8B HD
+        match chart_list.eight_buttons.HD {
+            Some(c) => {
+                charts.push(Chart {
+                    level: c.level,
+                    floor: c.floor,
+                    rating: c.rating,
+                    button: ButtonMode::Eight,
+                    chart_type: ChartType::Hard,
+                });
+            }
+            None => {}
+        }
+        // 8B MX
+        match chart_list.eight_buttons.MX {
+            Some(c) => {
+                charts.push(Chart {
+                    level: c.level,
+                    floor: c.floor,
+                    rating: c.rating,
+                    button: ButtonMode::Eight,
+                    chart_type: ChartType::Maximum,
+                });
+            }
+            None => {}
+        }
+        // 8B SC
+        match chart_list.eight_buttons.SC {
+            Some(c) => {
+                charts.push(Chart {
+                    level: c.level,
+                    floor: c.floor,
+                    rating: c.rating,
+                    button: ButtonMode::Eight,
+                    chart_type: ChartType::Sc,
+                });
+            }
+            None => {}
+        }
+
+        song_set.charts = charts;
+
+        song_set_list.push(song_set);
+    }
+
+    song_set_list
 }
 
-/// Legacy struct (which will be removed.)
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct VArchiveSong {
-    pub title: usize,
-    pub name: String,
-    pub composer: String,
-    pub dlc_code: String,
-    pub dlc: String,
-    pub patterns: VArchiveSongPatternTable,
-}
-
-pub fn all_songs() -> Result<Vec<VArchiveSong>, APIError> {
+pub fn all_songs() -> Result<Vec<SongSet>, APIError> {
     let resp = ureq::get("https://v-archive.net/db/songs.json").call();
 
     match resp {
         Ok(resp) => {
             let resp_str = resp.into_string().unwrap();
-            Ok(serde_json::from_str(&resp_str).unwrap())
+            Ok(all_songs_parse(resp_str))
         }
         Err(Error::Status(code, resp)) => Err(catch_server_err(code, resp)),
         Err(_) => Err(APIError::UnknownError),
@@ -1246,19 +1937,19 @@ mod tests {
     }
 
     #[test]
-    fn get_user_song_info() {
+    fn get_user_song_record() {
         let example_username = "내꺼";
-        let song_result = VArchiveSongUserResult::load_song_result(example_username, &555);
+        let song_result = load_user_song_result(example_username, 555);
 
         match song_result {
             Ok(r) => {
-                assert_eq!(r.success, true);
-                assert_eq!(r.title, 555);
-                // assert_eq!(r.song_id, 555); -- Maybe does later
-                assert_eq!(r.name, "Gloxinia".to_string());
-                assert_eq!(r.composer, "Ruxxi, Milkoi".to_string());
-                assert_eq!(r.dlc_code, "VE4".to_string());
-                assert_eq!(r.patterns.four_buttons.normal.level, 5);
+                assert_eq!(r.song_content.song_id, 555);
+                assert_eq!(r.song_content.title, "Gloxinia".to_string());
+                assert_eq!(r.song_content.artist, "Ruxxi, Milkoi".to_string());
+                assert!(matches!(
+                    r.song_content.song_cat,
+                    SongCatagory::NewExtention(NewExtCat::VExtentionFour)
+                ));
             }
             Err(e) => panic!("it has error: {}", e.to_string()),
         };
@@ -1319,12 +2010,13 @@ mod tests {
 
         match song_list_resp {
             Ok(list) => {
-                let first_song = &list[0];
-                assert_eq!(first_song.name, "비상 ~Stay With Me~".to_string());
-                assert_eq!(first_song.composer, "Mycin.T".to_string());
-                assert_eq!(first_song.dlc_code, "R".to_string());
-                assert_eq!(first_song.dlc, "RESPECT".to_string());
-                assert_eq!(first_song.patterns.four_buttons.normal.level, 4);
+                let first_song = &list[0].content;
+                assert_eq!(first_song.title, "비상 ~Stay With Me~".to_string());
+                assert_eq!(first_song.artist, "Mycin.T".to_string());
+                assert!(matches!(
+                    first_song.song_cat,
+                    SongCatagory::Respect(RespectCat::Respect)
+                ));
             }
             Err(e) => {
                 panic!("it has error: {}", e)
