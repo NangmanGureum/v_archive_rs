@@ -1,3 +1,4 @@
+use chrono::{DateTime, Datelike, FixedOffset, Local, TimeZone, Utc};
 use serde::{Deserialize, Serialize};
 use serde_this_or_that::as_bool;
 use std::convert::From;
@@ -133,6 +134,8 @@ pub enum NewExtCat {
     VLivertyOne,
     VLivertyTwo,
     VLivertyThree,
+    VLivertyFour,
+    VLivertyFive,
 }
 
 /// Cartegories for a song
@@ -152,6 +155,7 @@ impl From<&str> for SongCatagory {
         match idfinder {
             // RESPECT V default songs
             "R" => Self::Respect(RespectCat::Respect),
+            "RV" => Self::Respect(RespectCat::RespectV),
             "P1" => Self::Legacy(LegacyCat::PortableOne),
             "P2" => Self::Legacy(LegacyCat::PortableTwo),
             // Legacy DLC series
@@ -173,18 +177,63 @@ impl From<&str> for SongCatagory {
             "VL" => Self::NewExtention(NewExtCat::VLivertyOne),
             "VL2" => Self::NewExtention(NewExtCat::VLivertyTwo),
             "VL3" => Self::NewExtention(NewExtCat::VLivertyThree),
+            "VL4" => Self::NewExtention(NewExtCat::VLivertyFour),
+            "VL5" => Self::NewExtention(NewExtCat::VLivertyFive),
             // PLI extention
             "PLI1" => Self::Pli(1),
+            "PLI2" => Self::Pli(2),
+            "PLI3" => Self::Pli(3),
             // Collab DLC
             "GG" | "GC" | "CY" | "CHU" | "ESTI" | "NXN" | "MD" | "EZ2" | "MAP" | "FAL" | "TEK"
-            | "BA" => Self::Collab(idfinder.to_owned()),
+            | "BA" | "ARC" | "OGK" => Self::Collab(idfinder.to_owned()),
             _ => Self::Others(idfinder.to_owned()),
         }
     }
 }
 
+// To string for `SongCatagory`
+impl fmt::Display for SongCatagory {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SongCatagory::Respect(c) => match c {
+                RespectCat::Respect => write!(f, "R"),
+                RespectCat::RespectV => write!(f, "RV"),
+            },
+            SongCatagory::Legacy(c) => match c {
+                LegacyCat::PortableOne => write!(f, "P1"),
+                LegacyCat::PortableTwo => write!(f, "P2"),
+            },
+            SongCatagory::LegacyExtention(c) => match c {
+                LegacyExtCat::Trilogy => write!(f, "P1"),
+                LegacyExtCat::Clazziquai => write!(f, "TR"),
+                LegacyExtCat::TechnikaOne => write!(f, "T1"),
+                LegacyExtCat::BlackSquare => write!(f, "BS"),
+                LegacyExtCat::TechnikaTwo => write!(f, "T2"),
+                LegacyExtCat::TechnikaThree => write!(f, "T3"),
+                LegacyExtCat::EmotionalSense => write!(f, "ES"),
+                LegacyExtCat::PortableThree => write!(f, "P3"),
+                LegacyExtCat::TechnikaTuneQ => write!(f, "TQ"),
+            },
+            SongCatagory::NewExtention(c) => match c {
+                NewExtCat::VExtentionOne => write!(f, "VE"),
+                NewExtCat::VExtentionTwo => write!(f, "VE2"),
+                NewExtCat::VExtentionThree => write!(f, "VE3"),
+                NewExtCat::VExtentionFour => write!(f, "VE4"),
+                NewExtCat::VExtentionFive => write!(f, "VE5"),
+                NewExtCat::VLivertyOne => write!(f, "VL"),
+                NewExtCat::VLivertyTwo => write!(f, "VL2"),
+                NewExtCat::VLivertyThree => write!(f, "VL3"),
+                NewExtCat::VLivertyFour => write!(f, "VL4"),
+                NewExtCat::VLivertyFive => write!(f, "VL5"),
+            },
+            SongCatagory::Pli(v) => write!(f, "PLI{}", v),
+            SongCatagory::Collab(c) => write!(f, "{}", c),
+            SongCatagory::Others(c) => write!(f, "{}", c),
+        }
+    }
+}
+
 /// Button modes for a chart
-#[repr(u8)]
 #[derive(Debug)]
 pub enum ButtonMode {
     Four,
@@ -240,6 +289,18 @@ impl fmt::Display for ButtonMode {
             Self::Six => write!(f, "6"),
             Self::Eight => write!(f, "8"),
             Self::Other(b) => write!(f, "{}", b),
+        }
+    }
+}
+
+impl From<ButtonMode> for u8 {
+    fn from(mode: ButtonMode) -> u8 {
+        match mode {
+            ButtonMode::Four => 4,
+            ButtonMode::Five => 5,
+            ButtonMode::Six => 6,
+            ButtonMode::Eight => 8,
+            ButtonMode::Other(b) => b,
         }
     }
 }
@@ -339,6 +400,8 @@ pub struct UserChartRecord {
     pub dj_power: Option<f64>,
     /// A category for a song of the chart
     pub song_cat: Option<SongCatagory>,
+    /// A timestamp for the record updated at
+    pub updated_at: Option<DateTime<Utc>>,
 }
 
 impl UserChartRecord {
@@ -356,6 +419,42 @@ impl UserChartRecord {
             maximum_rating: None,
             dj_power: None,
             song_cat: None,
+            updated_at: None,
+        }
+    }
+
+    /// A pseudo-timestamp for the record updated at. It should goes to: `(year, month, day)`
+    /// This is using datetime without `chrono` library.
+    pub fn updated_at_utc(&self) -> Option<(i32, u32, u32)> {
+        match self.updated_at {
+            Some(t) => Some((t.year() as i32, t.month() as u32, t.day() as u32)),
+            None => None,
+        }
+    }
+
+    /// A local pseudo-timestamp for the record updated at. It should goes to: `(year, month, day)`
+    /// This is using datetime without `chrono` library.
+    pub fn updated_at_local(&self) -> Option<(i32, u32, u32)> {
+        match self.updated_at {
+            Some(t) => {
+                let t = t.with_timezone(&Local);
+                Some((t.year() as i32, t.month() as u32, t.day() as u32))
+            }
+            None => None,
+        }
+    }
+
+    /// A pseudo-timestamp with offset for the record updated at. It should goes to: `(year, month, day)`
+    /// This is using datetime without `chrono` library.
+    pub fn updated_at_with_offset(&self, offset: i32) -> Option<(i32, u32, u32)> {
+        match self.updated_at {
+            Some(t) => {
+                let t = FixedOffset::east_opt(offset * 3600)
+                    .unwrap()
+                    .from_utc_datetime(&t.naive_utc());
+                Some((t.year() as i32, t.month() as u32, t.day() as u32))
+            }
+            None => None,
         }
     }
 }
@@ -779,6 +878,7 @@ fn user_floor_board_parse(parse_text: String) -> UserFloorRecordBoard {
         rating: f64,
         dlc: String,
         dlc_code: String,
+        updated_at: Option<String>,
     }
 
     #[derive(Deserialize)]
@@ -824,6 +924,11 @@ fn user_floor_board_parse(parse_text: String) -> UserFloorRecordBoard {
             user_record.acc_rate = match record.score {
                 None => None,
                 Some(s) => Some(s.parse().unwrap()),
+            };
+
+            user_record.updated_at = match record.updated_at {
+                None => None,
+                Some(s) => Some(DateTime::parse_from_rfc3339(&s).unwrap().to_utc()),
             };
 
             user_records.push(user_record);
@@ -907,6 +1012,8 @@ fn user_song_result_parse(parse_text: String) -> SongUserRecord {
         #[serde(default)]
         #[serde(deserialize_with = "as_bool")]
         max_combo: bool,
+        #[serde(default)]
+        updated_at: Option<String>,
     }
 
     #[derive(Deserialize, Default)]
@@ -971,6 +1078,10 @@ fn user_song_result_parse(parse_text: String) -> SongUserRecord {
                 Some(s) => Some(s.parse::<f64>().unwrap()),
                 None => None,
             };
+            let updated_at = match r.updated_at {
+                Some(s) => Some(DateTime::parse_from_rfc3339(&s).unwrap().to_utc()),
+                None => None,
+            };
             records.push(UserChartRecord {
                 song_id,
                 title: song_title.clone(),
@@ -984,6 +1095,7 @@ fn user_song_result_parse(parse_text: String) -> SongUserRecord {
                 maximum_rating: None,
                 dj_power: r.djpower,
                 song_cat: Some(song_cat.clone()),
+                updated_at,
             });
         }
         None => {}
@@ -993,6 +1105,10 @@ fn user_song_result_parse(parse_text: String) -> SongUserRecord {
         Some(r) => {
             let acc_rate = match r.score {
                 Some(s) => Some(s.parse::<f64>().unwrap()),
+                None => None,
+            };
+            let updated_at = match r.updated_at {
+                Some(s) => Some(DateTime::parse_from_rfc3339(&s).unwrap().to_utc()),
                 None => None,
             };
             records.push(UserChartRecord {
@@ -1008,6 +1124,7 @@ fn user_song_result_parse(parse_text: String) -> SongUserRecord {
                 maximum_rating: None,
                 dj_power: r.djpower,
                 song_cat: Some(song_cat.clone()),
+                updated_at,
             });
         }
         None => {}
@@ -1017,6 +1134,10 @@ fn user_song_result_parse(parse_text: String) -> SongUserRecord {
         Some(r) => {
             let acc_rate = match r.score {
                 Some(s) => Some(s.parse::<f64>().unwrap()),
+                None => None,
+            };
+            let updated_at = match r.updated_at {
+                Some(s) => Some(DateTime::parse_from_rfc3339(&s).unwrap().to_utc()),
                 None => None,
             };
             records.push(UserChartRecord {
@@ -1032,6 +1153,7 @@ fn user_song_result_parse(parse_text: String) -> SongUserRecord {
                 maximum_rating: None,
                 dj_power: r.djpower,
                 song_cat: Some(song_cat.clone()),
+                updated_at,
             });
         }
         None => {}
@@ -1041,6 +1163,10 @@ fn user_song_result_parse(parse_text: String) -> SongUserRecord {
         Some(r) => {
             let acc_rate = match r.score {
                 Some(s) => Some(s.parse::<f64>().unwrap()),
+                None => None,
+            };
+            let updated_at = match r.updated_at {
+                Some(s) => Some(DateTime::parse_from_rfc3339(&s).unwrap().to_utc()),
                 None => None,
             };
             records.push(UserChartRecord {
@@ -1056,6 +1182,7 @@ fn user_song_result_parse(parse_text: String) -> SongUserRecord {
                 maximum_rating: None,
                 dj_power: r.djpower,
                 song_cat: Some(song_cat.clone()),
+                updated_at,
             });
         }
         None => {}
@@ -1068,6 +1195,10 @@ fn user_song_result_parse(parse_text: String) -> SongUserRecord {
                 Some(s) => Some(s.parse::<f64>().unwrap()),
                 None => None,
             };
+            let updated_at = match r.updated_at {
+                Some(s) => Some(DateTime::parse_from_rfc3339(&s).unwrap().to_utc()),
+                None => None,
+            };
             records.push(UserChartRecord {
                 song_id,
                 title: song_title.clone(),
@@ -1081,6 +1212,7 @@ fn user_song_result_parse(parse_text: String) -> SongUserRecord {
                 maximum_rating: None,
                 dj_power: r.djpower,
                 song_cat: Some(song_cat.clone()),
+                updated_at,
             });
         }
         None => {}
@@ -1090,6 +1222,10 @@ fn user_song_result_parse(parse_text: String) -> SongUserRecord {
         Some(r) => {
             let acc_rate = match r.score {
                 Some(s) => Some(s.parse::<f64>().unwrap()),
+                None => None,
+            };
+            let updated_at = match r.updated_at {
+                Some(s) => Some(DateTime::parse_from_rfc3339(&s).unwrap().to_utc()),
                 None => None,
             };
             records.push(UserChartRecord {
@@ -1105,6 +1241,7 @@ fn user_song_result_parse(parse_text: String) -> SongUserRecord {
                 maximum_rating: None,
                 dj_power: r.djpower,
                 song_cat: Some(song_cat.clone()),
+                updated_at,
             });
         }
         None => {}
@@ -1114,6 +1251,10 @@ fn user_song_result_parse(parse_text: String) -> SongUserRecord {
         Some(r) => {
             let acc_rate = match r.score {
                 Some(s) => Some(s.parse::<f64>().unwrap()),
+                None => None,
+            };
+            let updated_at = match r.updated_at {
+                Some(s) => Some(DateTime::parse_from_rfc3339(&s).unwrap().to_utc()),
                 None => None,
             };
             records.push(UserChartRecord {
@@ -1129,6 +1270,7 @@ fn user_song_result_parse(parse_text: String) -> SongUserRecord {
                 maximum_rating: None,
                 dj_power: r.djpower,
                 song_cat: Some(song_cat.clone()),
+                updated_at,
             });
         }
         None => {}
@@ -1138,6 +1280,10 @@ fn user_song_result_parse(parse_text: String) -> SongUserRecord {
         Some(r) => {
             let acc_rate = match r.score {
                 Some(s) => Some(s.parse::<f64>().unwrap()),
+                None => None,
+            };
+            let updated_at = match r.updated_at {
+                Some(s) => Some(DateTime::parse_from_rfc3339(&s).unwrap().to_utc()),
                 None => None,
             };
             records.push(UserChartRecord {
@@ -1153,6 +1299,7 @@ fn user_song_result_parse(parse_text: String) -> SongUserRecord {
                 maximum_rating: None,
                 dj_power: r.djpower,
                 song_cat: Some(song_cat.clone()),
+                updated_at,
             });
         }
         None => {}
@@ -1165,6 +1312,10 @@ fn user_song_result_parse(parse_text: String) -> SongUserRecord {
                 Some(s) => Some(s.parse::<f64>().unwrap()),
                 None => None,
             };
+            let updated_at = match r.updated_at {
+                Some(s) => Some(DateTime::parse_from_rfc3339(&s).unwrap().to_utc()),
+                None => None,
+            };
             records.push(UserChartRecord {
                 song_id,
                 title: song_title.clone(),
@@ -1178,6 +1329,7 @@ fn user_song_result_parse(parse_text: String) -> SongUserRecord {
                 maximum_rating: None,
                 dj_power: r.djpower,
                 song_cat: Some(song_cat.clone()),
+                updated_at,
             });
         }
         None => {}
@@ -1187,6 +1339,10 @@ fn user_song_result_parse(parse_text: String) -> SongUserRecord {
         Some(r) => {
             let acc_rate = match r.score {
                 Some(s) => Some(s.parse::<f64>().unwrap()),
+                None => None,
+            };
+            let updated_at = match r.updated_at {
+                Some(s) => Some(DateTime::parse_from_rfc3339(&s).unwrap().to_utc()),
                 None => None,
             };
             records.push(UserChartRecord {
@@ -1202,6 +1358,7 @@ fn user_song_result_parse(parse_text: String) -> SongUserRecord {
                 maximum_rating: None,
                 dj_power: r.djpower,
                 song_cat: Some(song_cat.clone()),
+                updated_at,
             });
         }
         None => {}
@@ -1211,6 +1368,10 @@ fn user_song_result_parse(parse_text: String) -> SongUserRecord {
         Some(r) => {
             let acc_rate = match r.score {
                 Some(s) => Some(s.parse::<f64>().unwrap()),
+                None => None,
+            };
+            let updated_at = match r.updated_at {
+                Some(s) => Some(DateTime::parse_from_rfc3339(&s).unwrap().to_utc()),
                 None => None,
             };
             records.push(UserChartRecord {
@@ -1226,6 +1387,7 @@ fn user_song_result_parse(parse_text: String) -> SongUserRecord {
                 maximum_rating: None,
                 dj_power: r.djpower,
                 song_cat: Some(song_cat.clone()),
+                updated_at,
             });
         }
         None => {}
@@ -1235,6 +1397,10 @@ fn user_song_result_parse(parse_text: String) -> SongUserRecord {
         Some(r) => {
             let acc_rate = match r.score {
                 Some(s) => Some(s.parse::<f64>().unwrap()),
+                None => None,
+            };
+            let updated_at = match r.updated_at {
+                Some(s) => Some(DateTime::parse_from_rfc3339(&s).unwrap().to_utc()),
                 None => None,
             };
             records.push(UserChartRecord {
@@ -1250,6 +1416,7 @@ fn user_song_result_parse(parse_text: String) -> SongUserRecord {
                 maximum_rating: None,
                 dj_power: r.djpower,
                 song_cat: Some(song_cat.clone()),
+                updated_at,
             });
         }
         None => {}
@@ -1262,6 +1429,10 @@ fn user_song_result_parse(parse_text: String) -> SongUserRecord {
                 Some(s) => Some(s.parse::<f64>().unwrap()),
                 None => None,
             };
+            let updated_at = match r.updated_at {
+                Some(s) => Some(DateTime::parse_from_rfc3339(&s).unwrap().to_utc()),
+                None => None,
+            };
             records.push(UserChartRecord {
                 song_id,
                 title: song_title.clone(),
@@ -1275,6 +1446,7 @@ fn user_song_result_parse(parse_text: String) -> SongUserRecord {
                 maximum_rating: None,
                 dj_power: r.djpower,
                 song_cat: Some(song_cat.clone()),
+                updated_at,
             });
         }
         None => {}
@@ -1284,6 +1456,10 @@ fn user_song_result_parse(parse_text: String) -> SongUserRecord {
         Some(r) => {
             let acc_rate = match r.score {
                 Some(s) => Some(s.parse::<f64>().unwrap()),
+                None => None,
+            };
+            let updated_at = match r.updated_at {
+                Some(s) => Some(DateTime::parse_from_rfc3339(&s).unwrap().to_utc()),
                 None => None,
             };
             records.push(UserChartRecord {
@@ -1299,6 +1475,7 @@ fn user_song_result_parse(parse_text: String) -> SongUserRecord {
                 maximum_rating: None,
                 dj_power: r.djpower,
                 song_cat: Some(song_cat.clone()),
+                updated_at,
             });
         }
         None => {}
@@ -1308,6 +1485,10 @@ fn user_song_result_parse(parse_text: String) -> SongUserRecord {
         Some(r) => {
             let acc_rate = match r.score {
                 Some(s) => Some(s.parse::<f64>().unwrap()),
+                None => None,
+            };
+            let updated_at = match r.updated_at {
+                Some(s) => Some(DateTime::parse_from_rfc3339(&s).unwrap().to_utc()),
                 None => None,
             };
             records.push(UserChartRecord {
@@ -1323,6 +1504,7 @@ fn user_song_result_parse(parse_text: String) -> SongUserRecord {
                 maximum_rating: None,
                 dj_power: r.djpower,
                 song_cat: Some(song_cat.clone()),
+                updated_at,
             });
         }
         None => {}
@@ -1332,6 +1514,10 @@ fn user_song_result_parse(parse_text: String) -> SongUserRecord {
         Some(r) => {
             let acc_rate = match r.score {
                 Some(s) => Some(s.parse::<f64>().unwrap()),
+                None => None,
+            };
+            let updated_at = match r.updated_at {
+                Some(s) => Some(DateTime::parse_from_rfc3339(&s).unwrap().to_utc()),
                 None => None,
             };
             records.push(UserChartRecord {
@@ -1347,6 +1533,7 @@ fn user_song_result_parse(parse_text: String) -> SongUserRecord {
                 maximum_rating: None,
                 dj_power: r.djpower,
                 song_cat: Some(song_cat.clone()),
+                updated_at,
             });
         }
         None => {}
@@ -1374,115 +1561,86 @@ pub fn load_user_song_result(username: &str, song_id: usize) -> Result<SongUserR
     }
 }
 
-// /// This is a user's song result. Legacy struct (which will be removed.)
-// #[derive(Serialize, Deserialize, Debug)]
-// #[serde(rename_all = "camelCase")]
-// pub struct VArchiveSongUserResult {
-//     success: bool,
-//     pub title: usize,
-//     pub name: String,
-//     pub composer: String,
-//     pub dlc_code: String,
-//     pub dlc: String,
-//     pub patterns: VArchivePatternTable,
-// }
+pub fn get_full_dlc_name(dlc_code: String) -> Result<String, APIError> {
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct APIObj {
+        dlc_code: String,
+        dlc_name: String,
+        ymdt: String,
+    }
+    let resp = ureq::get("https://v-archive.net/db/dlcs.json").call();
 
-// impl VArchiveSongUserResult {
-//     pub fn new() -> Self {
-//         Self {
-//             success: true,
-//             title: 0,
-//             name: String::new(),
-//             composer: String::new(),
-//             dlc_code: String::new(),
-//             dlc: String::new(),
-//             patterns: VArchivePatternTable::new(),
-//         }
-//     }
+    match resp {
+        Ok(resp) => {
+            let resp_str = resp.into_string().expect("failed to read response body");
+            let list: Vec<APIObj> =
+                serde_json::from_str(&resp_str).expect("failed to parse dlcs.json");
 
-//     pub fn load_song_result(username: &str, song_id: &usize) -> Result<Self, APIError> {
-//         let get_url = format!("https://v-archive.net/api/archive/{username}/title/{song_id}");
-//         let resp = ureq::get(&get_url)
-//             .set("Content-Type", "application/json")
-//             .call();
-
-//         match resp {
-//             Ok(resp) => {
-//                 let resp_str = resp.into_string().unwrap();
-//                 Ok(serde_json::from_str(&resp_str).unwrap())
-//             }
-//             Err(Error::Status(code, resp)) => Err(catch_server_err(code, resp)),
-//             Err(_) => Err(APIError::UnknownError),
-//         }
-//     }
-// }
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct VArchiveRegisterResult {
-    success: bool,
-    update: bool,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct VArchiveRegisterRecord {
-    pub name: String,
-    pub dlc: String,
-    pub composer: String,
-    pub button: u8,
-    pub pattern: String,
-    pub score: f64,
-    pub max_combo: u8,
-}
-
-impl VArchiveRegisterRecord {
-    pub fn new() -> Self {
-        Self {
-            name: String::new(),
-            dlc: String::new(),
-            composer: String::new(),
-            button: 0,
-            pattern: "NORMAL".to_string(),
-            score: 0.0,
-            max_combo: 0,
+            list.into_iter()
+                .find(|obj| obj.dlc_code == dlc_code)
+                .map(|obj| obj.dlc_name)
+                .ok_or(APIError::CannotFindSong)
         }
+        Err(Error::Status(code, resp)) => Err(catch_server_err(code, resp)),
+        Err(_) => Err(APIError::UnknownError),
     }
 }
 
-pub struct VArchiveUserToken {
+pub struct UserToken {
     pub user_num: usize,
     pub user_token: String,
 }
 
-impl VArchiveUserToken {
-    pub fn new() -> Self {
-        Self {
-            user_num: 0,
-            user_token: String::new(),
-        }
+#[derive(Serialize, Deserialize, Debug)]
+pub struct APIRegisterResult {
+    pub success: bool,
+    pub update: bool,
+}
+
+pub fn register_record(
+    token: UserToken,
+    record: UserChartRecord,
+) -> Result<APIRegisterResult, APIError> {
+    let user_num = &token.user_num;
+
+    #[derive(Serialize, Deserialize, Debug)]
+    #[serde(rename_all = "camelCase")]
+    struct APIPlayRecord {
+        name: String,
+        dlc: String,
+        button: u8,
+        pattern: String,
+        score: f64,
+        max_combo: u8,
     }
 
-    pub fn register_record(
-        self,
-        record: VArchiveRegisterRecord,
-    ) -> Result<VArchiveRegisterResult, APIError> {
-        let user_num = self.user_num;
-        let record_serial = serde_json::to_string(&record).unwrap();
+    let dlc_name = get_full_dlc_name(record.song_cat.unwrap().to_string()).expect("No exist DLC");
 
-        let post_url = format!("https://v-archive.net/client/open/{user_num}/score");
-        let resp = ureq::post(&post_url)
-            .set("Authorization", &self.user_token)
-            .set("Content-Type", "application/json")
-            .send_string(&record_serial);
+    let data_for_api: APIPlayRecord = APIPlayRecord {
+        name: record.title,
+        dlc: dlc_name,
+        button: u8::from(record.button),
+        pattern: record.chart_type.to_string(),
+        score: record.acc_rate.unwrap(),
+        max_combo: record.is_max_combo as u8,
+    };
 
-        match resp {
-            Ok(resp) => {
-                let resp_str = resp.into_string().unwrap();
-                Ok(serde_json::from_str(&resp_str).unwrap())
-            }
-            Err(Error::Status(code, resp)) => Err(catch_server_err(code, resp)),
-            Err(_) => Err(APIError::UnknownError),
+    let record_serial = serde_json::to_string(&data_for_api).unwrap();
+
+    let post_url = format!("https://v-archive.net/client/open/{user_num}/score");
+    let resp = ureq::post(&post_url)
+        .set("Authorization", &token.user_token)
+        .set("Content-Type", "application/json")
+        .send_string(&record_serial);
+
+    match resp {
+        Ok(resp) => {
+            let resp_str = resp.into_string().unwrap();
+            Ok(serde_json::from_str(&resp_str).unwrap())
         }
+        Err(Error::Status(code, resp)) => Err(catch_server_err(code, resp)),
+        Err(_) => Err(APIError::UnknownError),
     }
 }
 
@@ -1978,23 +2136,29 @@ mod tests {
     }
 
     #[test]
-    fn register_record() {
-        let user = VArchiveUserToken {
+    fn register_record_test() {
+        let user = UserToken {
             user_num: 1,
             user_token: "95d6c422-52b4-4016-8587-38c46a2e7917".to_string(),
         };
 
-        let play_record = VArchiveRegisterRecord {
-            name: "Urban Night".to_string(),
-            dlc: "EMOTIONAL S.".to_string(),
-            composer: "Electronic Boutique".to_string(),
-            button: 6,
-            pattern: "SC".to_string(),
-            score: 90.9,
-            max_combo: 0,
+        let play_record = UserChartRecord {
+            song_id: 0,
+            title: "Urban Night".to_string(),
+            button: ButtonMode::Six,
+            chart_type: ChartType::Sc,
+            acc_rate: Some(90.9),
+            is_max_combo: false,
+            chart_level: None,
+            floor_level: None,
+            user_rating: None,
+            maximum_rating: None,
+            dj_power: None,
+            song_cat: Some(SongCatagory::LegacyExtention(LegacyExtCat::EmotionalSense)),
+            updated_at: None,
         };
 
-        let req = user.register_record(play_record);
+        let req = register_record(user, play_record);
 
         match req {
             Ok(r) => assert_eq!(r.success, true),

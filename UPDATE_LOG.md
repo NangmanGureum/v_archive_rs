@@ -1,3 +1,16 @@
+* 0.13.0
+  * Edit `UserChartRecord`
+    * Add `updated_at_utc`, `updated_at_local`, `updated_at` function
+  * Add function `register_record()`, struct `UserToken`
+    * Delete `VArchiveUserToken`
+    * Change test codes
+  * Add function `get_full_dlc_name()`
+  * Add support DLCs:
+    * Arcaea Collab (`ARC`)
+    * V LIVERTY 4(`NewExtCat::VL4`)
+    * O.N.G.E.K.I. Collab(`OGK`)
+    * V LIVERTY 5(`NewExtCat::VL5`), but not support right now.
+  * Update `README.md`, `TODO.md`
 * 0.12.0
   * Remove `struct`s
     * `VArchivePattern` (replaced to `Chart`)
